@@ -14,8 +14,16 @@ dependencies = [
     "keyring",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
+
 [project.scripts]
 lp-bug = "lp_bug_manager.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["lp_bug_manager*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
