@@ -5,8 +5,8 @@ from datetime import date, timedelta
 import click
 from prettytable import PrettyTable
 
-from lp_bug_manager import bugs
-from lp_bug_manager.releases import list_cycles
+from lp_bug_manager import bugs, analytics
+from lp_bug_manager.releases import list_cycles, get_cycle
 
 DEFAULT_PROJECTS = ["manila", "manila-ui", "python-manilaclient"]
 
@@ -147,6 +147,46 @@ def link_gerrit(bug_id, gerrit_url, comment):
     """Add a Gerrit review link to bug BUG_ID."""
     bug = bugs.add_gerrit_link(bug_id, gerrit_url, comment=comment)
     click.echo(f"Linked Gerrit review to bug #{bug.id}")
+
+
+# -- reported --
+@main.command("reported")
+@click.argument("project")
+@click.argument("cycle")
+def reported(project, cycle):
+    """Bugs reported during a release CYCLE (e.g., Gazpacho or 2026.1)."""
+    result = analytics.bugs_reported_in_cycle(project, cycle)
+    version, info = get_cycle(cycle)
+    click.echo(f"Bugs reported on {project} during {info['name']} "
+               f"({info['start']} to {info['end']}): {len(result)}")
+    if result:
+        click.echo(_bug_table(result))
+
+
+# -- fixed --
+@main.command("fixed")
+@click.argument("project")
+@click.argument("cycle")
+def fixed(project, cycle):
+    """Bugs fixed during a release CYCLE."""
+    result = analytics.bugs_fixed_in_cycle(project, cycle)
+    version, info = get_cycle(cycle)
+    click.echo(f"Bugs fixed on {project} during {info['name']} "
+               f"({info['start']} to {info['end']}): {len(result)}")
+    if result:
+        click.echo(_bug_table(result))
+
+
+# -- rotten --
+@main.command("rotten")
+@click.argument("project")
+@click.option("--days", "-d", default=180, help="Days of inactivity (default: 180)")
+def rotten(project, days):
+    """Find rotten bugs with no activity for N days."""
+    result = analytics.rotten_bugs(project, days=days)
+    click.echo(f"Rotten bugs on {project} (no activity for {days}+ days): {len(result)}")
+    if result:
+        click.echo(_bug_table(result, show_inactive=True))
 
 
 # -- releases --
