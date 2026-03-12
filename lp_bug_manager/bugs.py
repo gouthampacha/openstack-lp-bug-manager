@@ -38,8 +38,16 @@ def file_bug(project_name, title, description, importance=None, status=None, tag
     return bug
 
 
+def _to_utc_datetime(d):
+    """Convert a date or datetime to a UTC datetime."""
+    if isinstance(d, datetime):
+        return d
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+
+
 def search_bugs(project_name, status=None, importance=None,
                 created_since=None, created_before=None,
+                modified_since=None,
                 tags=None, search_text=None, max_results=50):
     """Search bugs on a project with filters."""
     project = get_project(project_name)
@@ -50,9 +58,11 @@ def search_bugs(project_name, status=None, importance=None,
     if importance:
         kwargs["importance"] = importance if isinstance(importance, list) else [importance]
     if created_since:
-        kwargs["created_since"] = created_since
+        kwargs["created_since"] = _to_utc_datetime(created_since)
     if created_before:
-        kwargs["created_before"] = created_before
+        kwargs["created_before"] = _to_utc_datetime(created_before)
+    if modified_since:
+        kwargs["modified_since"] = _to_utc_datetime(modified_since)
     if tags:
         kwargs["tags"] = tags if isinstance(tags, list) else [tags]
     if search_text:

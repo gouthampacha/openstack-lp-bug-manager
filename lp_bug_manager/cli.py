@@ -1,5 +1,7 @@
 """CLI entry point for openstack-lp-bug-manager."""
 
+from datetime import date, timedelta
+
 import click
 from prettytable import PrettyTable
 
@@ -86,15 +88,28 @@ def show_bug(bug_id):
               help="Filter by importance (repeatable)")
 @click.option("--tag", "-t", multiple=True, help="Filter by tag (repeatable)")
 @click.option("--text", "-q", default=None, help="Full-text search")
+@click.option("--since", default=None, help="Created since date (YYYY-MM-DD) or Nd for last N days")
+@click.option("--before", default=None, help="Created before date (YYYY-MM-DD)")
 @click.option("--max", "max_results", default=50, help="Max results")
-def search(project, status, importance, tag, text, max_results):
+def search(project, status, importance, tag, text, since, before, max_results):
     """Search bugs on PROJECT."""
+    created_since = None
+    created_before = None
+    if since:
+        if since.endswith("d"):
+            created_since = date.today() - timedelta(days=int(since[:-1]))
+        else:
+            created_since = date.fromisoformat(since)
+    if before:
+        created_before = date.fromisoformat(before)
     results = bugs.search_bugs(
         project,
         status=list(status) or None,
         importance=list(importance) or None,
         tags=list(tag) or None,
         search_text=text,
+        created_since=created_since,
+        created_before=created_before,
         max_results=max_results,
     )
     if not results:
