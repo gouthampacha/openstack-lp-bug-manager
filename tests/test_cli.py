@@ -1,7 +1,7 @@
 """Tests for CLI commands."""
 
 from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
@@ -36,8 +36,12 @@ class TestSearch:
     @patch("lp_bug_manager.cli.bugs.search_bugs")
     def test_displays_results(self, mock_search, runner):
         mock_search.return_value = [
-            make_search_result(2143047, "Netapp: Add support for force-delete",
-                               status="New", importance="Undecided"),
+            make_search_result(
+                2143047,
+                "Netapp: Add support for force-delete",
+                status="New",
+                importance="Undecided",
+            ),
         ]
         result = runner.invoke(main, ["search", "manila", "-s", "New"])
         assert result.exit_code == 0
@@ -73,12 +77,14 @@ class TestShow:
             "web_link": "https://bugs.launchpad.net/manila-ui/+bug/2144047",
             "created": datetime(2026, 3, 1, tzinfo=timezone.utc),
             "updated": datetime(2026, 3, 12, tzinfo=timezone.utc),
-            "tasks": [{
-                "target": "manila-ui",
-                "status": "New",
-                "importance": "Medium",
-                "assignee": "Rose Kimondo",
-            }],
+            "tasks": [
+                {
+                    "target": "manila-ui",
+                    "status": "New",
+                    "importance": "Medium",
+                    "assignee": "Rose Kimondo",
+                }
+            ],
         }
         result = runner.invoke(main, ["show", "2144047"])
         assert result.exit_code == 0
@@ -106,8 +112,11 @@ class TestScrub:
     @patch("lp_bug_manager.cli.analytics.scrub_report")
     def test_with_days(self, mock_scrub, runner):
         mock_scrub.return_value = {
-            "new": [], "incomplete": [], "unassigned_triaged": [],
-            "stale_in_progress": [], "recent": [],
+            "new": [],
+            "incomplete": [],
+            "unassigned_triaged": [],
+            "stale_in_progress": [],
+            "recent": [],
         }
         runner.invoke(main, ["scrub", "manila", "--days", "90"])
         mock_scrub.assert_called_once_with("manila", days=90, stale_days=30)
@@ -115,8 +124,11 @@ class TestScrub:
     @patch("lp_bug_manager.cli.analytics.scrub_report")
     def test_defaults_to_all_projects(self, mock_scrub, runner):
         mock_scrub.return_value = {
-            "new": [], "incomplete": [], "unassigned_triaged": [],
-            "stale_in_progress": [], "recent": [],
+            "new": [],
+            "incomplete": [],
+            "unassigned_triaged": [],
+            "stale_in_progress": [],
+            "recent": [],
         }
         runner.invoke(main, ["scrub"])
         assert mock_scrub.call_count == 3
@@ -152,9 +164,13 @@ class TestSummary:
         mock_summary.return_value = {
             "version": "2026.1",
             "cycle": {"name": "Gazpacho", "start": "2025-10-01", "end": "2026-04-01"},
-            "reported_count": 0, "fixed_count": 0, "still_open": [],
-            "importance_breakdown": {}, "status_breakdown": {},
-            "top_reporters": [], "top_fixers": [],
+            "reported_count": 0,
+            "fixed_count": 0,
+            "still_open": [],
+            "importance_breakdown": {},
+            "status_breakdown": {},
+            "top_reporters": [],
+            "top_fixers": [],
         }
         runner.invoke(main, ["summary", "Gazpacho"])
         assert mock_summary.call_count == 3

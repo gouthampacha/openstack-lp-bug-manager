@@ -3,12 +3,19 @@
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
-import pytest
 
-
-def make_bug(id, title, status="New", importance="Undecided",
-             assignee=None, created=None, updated=None, tags=None,
-             description="", target="manila"):
+def make_bug(
+    id,
+    title,
+    status="New",
+    importance="Undecided",
+    assignee=None,
+    created=None,
+    updated=None,
+    tags=None,
+    description="",
+    target="manila",
+):
     """Create a mock Launchpad bug task and its parent bug."""
     bug = MagicMock()
     bug.id = id
@@ -34,9 +41,16 @@ def make_bug(id, title, status="New", importance="Undecided",
     return bug, task
 
 
-def make_search_result(id, title, status="New", importance="Undecided",
-                       assignee="Unassigned", created=None, updated=None,
-                       tags=None):
+def make_search_result(
+    id,
+    title,
+    status="New",
+    importance="Undecided",
+    assignee="Unassigned",
+    created=None,
+    updated=None,
+    tags=None,
+):
     """Create a dict matching the format returned by bugs.search_bugs."""
     return {
         "id": id,

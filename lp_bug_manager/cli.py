@@ -5,8 +5,8 @@ from datetime import date, timedelta
 import click
 from prettytable import PrettyTable
 
-from lp_bug_manager import bugs, analytics
-from lp_bug_manager.releases import list_cycles, get_cycle
+from lp_bug_manager import analytics, bugs
+from lp_bug_manager.releases import get_cycle, list_cycles
 
 DEFAULT_PROJECTS = ["manila", "manila-ui", "python-manilaclient"]
 
@@ -35,13 +35,15 @@ def _bug_table(bug_list, show_inactive=False, show_project=False):
         row = [b["id"]]
         if show_project:
             row.append(b.get("project", ""))
-        row.extend([
-            b["title"][:55],
-            b["status"],
-            b["importance"],
-            b["assignee"],
-            b["updated"].strftime("%Y-%m-%d"),
-        ])
+        row.extend(
+            [
+                b["title"][:55],
+                b["status"],
+                b["importance"],
+                b["assignee"],
+                b["updated"].strftime("%Y-%m-%d"),
+            ]
+        )
         if show_inactive:
             row.append(b.get("days_inactive", ""))
         t.add_row(row)
@@ -80,14 +82,16 @@ def main():
 @click.argument("project")
 @click.argument("title")
 @click.option("--description", "-d", default="", help="Bug description")
-@click.option("--importance", "-i", type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False))
+@click.option(
+    "--importance", "-i", type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False)
+)
 @click.option("--status", "-s", type=click.Choice(bugs.VALID_STATUSES, case_sensitive=False))
 @click.option("--tag", "-t", multiple=True, help="Tags (repeatable)")
 def file_bug(project, title, description, importance, status, tag):
     """File a new bug on PROJECT with TITLE."""
-    bug = bugs.file_bug(project, title, description,
-                        importance=importance, status=status,
-                        tags=list(tag) or None)
+    bug = bugs.file_bug(
+        project, title, description, importance=importance, status=status, tags=list(tag) or None
+    )
     click.echo(f"Created bug #{bug.id}: {bug.web_link}")
 
 
@@ -105,8 +109,9 @@ def show_bug(bug_id):
         click.echo(f"Tags: {', '.join(b['tags'])}")
     click.echo()
     for task in b["tasks"]:
-        click.echo(f"  [{task['target']}] {task['status']} / "
-                    f"{task['importance']} / {task['assignee']}")
+        click.echo(
+            f"  [{task['target']}] {task['status']} / {task['importance']} / {task['assignee']}"
+        )
     click.echo()
     click.echo(b["description"])
 
@@ -114,15 +119,25 @@ def show_bug(bug_id):
 # -- search --
 @main.command("search")
 @click.argument("project")
-@click.option("--status", "-s", multiple=True,
-              type=click.Choice(bugs.VALID_STATUSES, case_sensitive=False),
-              help="Filter by status (repeatable)")
-@click.option("--importance", "-i", multiple=True,
-              type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False),
-              help="Filter by importance (repeatable)")
+@click.option(
+    "--status",
+    "-s",
+    multiple=True,
+    type=click.Choice(bugs.VALID_STATUSES, case_sensitive=False),
+    help="Filter by status (repeatable)",
+)
+@click.option(
+    "--importance",
+    "-i",
+    multiple=True,
+    type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False),
+    help="Filter by importance (repeatable)",
+)
 @click.option("--tag", "-t", multiple=True, help="Filter by tag (repeatable)")
 @click.option("--text", "-q", default=None, help="Full-text search")
-@click.option("--since", default=None, help="Created since date (YYYY-MM-DD) or Nd for last N days")
+@click.option(
+    "--since", default=None, help="Created since date (YYYY-MM-DD) or Nd for last N days"
+)
 @click.option("--before", default=None, help="Created before date (YYYY-MM-DD)")
 @click.option("--max", "max_results", default=50, help="Max results")
 def search(project, status, importance, tag, text, since, before, max_results):
@@ -158,14 +173,18 @@ def search(project, status, importance, tag, text, since, before, max_results):
 @click.argument("bug_id", type=int)
 @click.argument("project")
 @click.option("--status", "-s", type=click.Choice(bugs.VALID_STATUSES, case_sensitive=False))
-@click.option("--importance", "-i", type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False))
+@click.option(
+    "--importance", "-i", type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False)
+)
 @click.option("--assignee", "-a", default=None, help="Launchpad username")
 @click.option("--tag", "-t", multiple=True, help="Set tags (replaces existing)")
 def update(bug_id, project, status, importance, assignee, tag):
     """Update bug BUG_ID on PROJECT."""
     bug = bugs.update_bug(
-        bug_id, project,
-        status=status, importance=importance,
+        bug_id,
+        project,
+        status=status,
+        importance=importance,
         assignee=assignee,
         tags=list(tag) if tag else None,
     )
@@ -191,8 +210,10 @@ def reported(project, cycle):
     """Bugs reported during a release CYCLE (e.g., Gazpacho or 2026.1)."""
     result = analytics.bugs_reported_in_cycle(project, cycle)
     version, info = get_cycle(cycle)
-    click.echo(f"Bugs reported on {project} during {info['name']} "
-               f"({info['start']} to {info['end']}): {len(result)}")
+    click.echo(
+        f"Bugs reported on {project} during {info['name']} "
+        f"({info['start']} to {info['end']}): {len(result)}"
+    )
     if result:
         click.echo(_bug_table(result))
 
@@ -205,8 +226,10 @@ def fixed(project, cycle):
     """Bugs fixed during a release CYCLE."""
     result = analytics.bugs_fixed_in_cycle(project, cycle)
     version, info = get_cycle(cycle)
-    click.echo(f"Bugs fixed on {project} during {info['name']} "
-               f"({info['start']} to {info['end']}): {len(result)}")
+    click.echo(
+        f"Bugs fixed on {project} during {info['name']} "
+        f"({info['start']} to {info['end']}): {len(result)}"
+    )
     if result:
         click.echo(_bug_table(result))
 
@@ -227,10 +250,12 @@ def rotten(project, days):
 @main.command("scrub")
 @click.argument("project", required=False)
 @click.option("--all", "all_projects", is_flag=True, help="Run across all Manila projects")
-@click.option("--days", "-d", default=None, type=int,
-              help="Only show bugs created in the last N days")
-@click.option("--stale-days", default=30, type=int,
-              help="Threshold for stale In Progress bugs (default: 30)")
+@click.option(
+    "--days", "-d", default=None, type=int, help="Only show bugs created in the last N days"
+)
+@click.option(
+    "--stale-days", default=30, type=int, help="Threshold for stale In Progress bugs (default: 30)"
+)
 def scrub(project, all_projects, days, stale_days):
     """Weekly bug scrub agenda. Shows untriaged, unassigned, stale, and recent bugs."""
     if not project and not all_projects:
@@ -258,19 +283,31 @@ def scrub(project, all_projects, days, stale_days):
         else:
             click.echo("  None")
 
-        click.echo(click.style(f"\n-- Triaged but Unassigned ({len(report['unassigned_triaged'])}) --", fg="yellow"))
+        click.echo(
+            click.style(
+                f"\n-- Triaged but Unassigned ({len(report['unassigned_triaged'])}) --",
+                fg="yellow",
+            )
+        )
         if report["unassigned_triaged"]:
             click.echo(_bug_table(report["unassigned_triaged"]))
         else:
             click.echo("  None")
 
-        click.echo(click.style(f"\n-- Stale In Progress (30+ days) ({len(report['stale_in_progress'])}) --", fg="red"))
+        click.echo(
+            click.style(
+                f"\n-- Stale In Progress (30+ days) ({len(report['stale_in_progress'])}) --",
+                fg="red",
+            )
+        )
         if report["stale_in_progress"]:
             click.echo(_bug_table(report["stale_in_progress"], show_inactive=True))
         else:
             click.echo("  None")
 
-        click.echo(click.style(f"\n-- Reported This Week ({len(report['recent'])}) --", fg="green"))
+        click.echo(
+            click.style(f"\n-- Reported This Week ({len(report['recent'])}) --", fg="green")
+        )
         if report["recent"]:
             click.echo(_bug_table(report["recent"]))
         else:
@@ -293,14 +330,10 @@ def summary(cycle, project, all_projects):
     for proj in projects:
         s = analytics.cycle_summary(proj, cycle)
 
-        click.echo(click.style(
-            f"\n{'=' * 60}", bold=True))
-        click.echo(click.style(
-            f"  {proj} -- {s['cycle']['name']} ({s['version']})", bold=True))
-        click.echo(click.style(
-            f"  {s['cycle']['start']} to {s['cycle']['end']}", bold=True))
-        click.echo(click.style(
-            f"{'=' * 60}", bold=True))
+        click.echo(click.style(f"\n{'=' * 60}", bold=True))
+        click.echo(click.style(f"  {proj} -- {s['cycle']['name']} ({s['version']})", bold=True))
+        click.echo(click.style(f"  {s['cycle']['start']} to {s['cycle']['end']}", bold=True))
+        click.echo(click.style(f"{'=' * 60}", bold=True))
 
         click.echo(f"\n  Bugs reported:   {s['reported_count']}")
         click.echo(f"  Bugs fixed:      {s['fixed_count']}")
@@ -308,23 +341,18 @@ def summary(cycle, project, all_projects):
 
         if s["importance_breakdown"]:
             click.echo(click.style("\n-- By Importance --", fg="cyan"))
-            click.echo(_kv_table(
-                sorted(s["importance_breakdown"].items()),
-                "Importance", "Count"))
+            click.echo(_kv_table(sorted(s["importance_breakdown"].items()), "Importance", "Count"))
 
         if s["status_breakdown"]:
             click.echo(click.style("\n-- By Current Status --", fg="cyan"))
-            click.echo(_kv_table(
-                sorted(s["status_breakdown"].items()),
-                "Status", "Count"))
+            click.echo(_kv_table(sorted(s["status_breakdown"].items()), "Status", "Count"))
 
         if s["top_fixers"]:
             click.echo(click.style("\n-- Top Fixers --", fg="green"))
             click.echo(_kv_table(s["top_fixers"][:10], "Assignee", "Fixed"))
 
         if s["still_open"]:
-            click.echo(click.style(
-                f"\n-- Still Open ({len(s['still_open'])}) --", fg="yellow"))
+            click.echo(click.style(f"\n-- Still Open ({len(s['still_open'])}) --", fg="yellow"))
             click.echo(_bug_table(s["still_open"]))
 
     click.echo()

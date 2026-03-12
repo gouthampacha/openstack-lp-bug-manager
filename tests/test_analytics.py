@@ -6,8 +6,11 @@ from unittest.mock import patch
 import pytest
 
 from lp_bug_manager.analytics import (
-    bugs_reported_in_cycle, bugs_fixed_in_cycle, rotten_bugs,
-    scrub_report, cycle_summary,
+    bugs_fixed_in_cycle,
+    bugs_reported_in_cycle,
+    cycle_summary,
+    rotten_bugs,
+    scrub_report,
 )
 from tests.conftest import make_search_result
 
@@ -57,11 +60,17 @@ class TestBugsFixedInCycle:
 
     def test_filters_out_bugs_updated_after_cycle_end(self, mock_search):
         in_cycle = make_search_result(
-            1, "Fixed in cycle", status="Fix Committed",
-            updated=datetime(2026, 2, 1, tzinfo=timezone.utc))
+            1,
+            "Fixed in cycle",
+            status="Fix Committed",
+            updated=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        )
         after_cycle = make_search_result(
-            2, "Fixed after cycle", status="Fix Released",
-            updated=datetime(2026, 5, 1, tzinfo=timezone.utc))
+            2,
+            "Fixed after cycle",
+            status="Fix Released",
+            updated=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        )
 
         # First call (Fix Committed) returns the in-cycle bug,
         # second call (Fix Released) returns the after-cycle bug
@@ -81,10 +90,8 @@ class TestRottenBugs:
         def side_effect(project, status=None, **kwargs):
             if status == "New":
                 return [
-                    make_search_result(1, "Old bug", status="New",
-                                       updated=old_date),
-                    make_search_result(2, "Recent bug", status="New",
-                                       updated=recent_date),
+                    make_search_result(1, "Old bug", status="New", updated=old_date),
+                    make_search_result(2, "Recent bug", status="New", updated=recent_date),
                 ]
             return []
 
@@ -99,10 +106,18 @@ class TestRottenBugs:
         def side_effect(project, status=None, **kwargs):
             if status == "New":
                 return [
-                    make_search_result(1, "Kinda old", status="New",
-                                       updated=datetime(2025, 6, 1, tzinfo=timezone.utc)),
-                    make_search_result(2, "Very old", status="New",
-                                       updated=datetime(2024, 1, 1, tzinfo=timezone.utc)),
+                    make_search_result(
+                        1,
+                        "Kinda old",
+                        status="New",
+                        updated=datetime(2025, 6, 1, tzinfo=timezone.utc),
+                    ),
+                    make_search_result(
+                        2,
+                        "Very old",
+                        status="New",
+                        updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                    ),
                 ]
             return []
 
@@ -128,10 +143,8 @@ class TestScrubReport:
         def side_effect(project, status=None, **kwargs):
             if status == ["Confirmed", "Triaged"]:
                 return [
-                    make_search_result(1, "Assigned", status="Triaged",
-                                       assignee="gouthamr"),
-                    make_search_result(2, "Unassigned", status="Triaged",
-                                       assignee="Unassigned"),
+                    make_search_result(1, "Assigned", status="Triaged", assignee="gouthamr"),
+                    make_search_result(2, "Unassigned", status="Triaged", assignee="Unassigned"),
                 ]
             return []
 
@@ -148,10 +161,8 @@ class TestScrubReport:
         def side_effect(project, status=None, **kwargs):
             if status == "In Progress":
                 return [
-                    make_search_result(1, "Stale", status="In Progress",
-                                       updated=old),
-                    make_search_result(2, "Active", status="In Progress",
-                                       updated=recent),
+                    make_search_result(1, "Stale", status="In Progress", updated=old),
+                    make_search_result(2, "Active", status="In Progress", updated=recent),
                 ]
             return []
 
@@ -179,18 +190,19 @@ class TestScrubReport:
 class TestCycleSummary:
     def test_computes_stats(self, mock_reported, mock_fixed):
         mock_reported.return_value = [
-            make_search_result(1, "Bug A", importance="High",
-                               status="Fix Released", assignee="alice"),
-            make_search_result(2, "Bug B", importance="Medium",
-                               status="New", assignee="Unassigned"),
-            make_search_result(3, "Bug C", importance="High",
-                               status="In Progress", assignee="bob"),
+            make_search_result(
+                1, "Bug A", importance="High", status="Fix Released", assignee="alice"
+            ),
+            make_search_result(
+                2, "Bug B", importance="Medium", status="New", assignee="Unassigned"
+            ),
+            make_search_result(
+                3, "Bug C", importance="High", status="In Progress", assignee="bob"
+            ),
         ]
         mock_fixed.return_value = [
-            make_search_result(1, "Bug A", status="Fix Released",
-                               assignee="alice"),
-            make_search_result(4, "Old bug", status="Fix Released",
-                               assignee="alice"),
+            make_search_result(1, "Bug A", status="Fix Released", assignee="alice"),
+            make_search_result(4, "Old bug", status="Fix Released", assignee="alice"),
         ]
 
         s = cycle_summary("manila", "Gazpacho")

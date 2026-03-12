@@ -1,18 +1,30 @@
 """Bug operations: create, list, search, update."""
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 from lp_bug_manager.client import get_launchpad, get_project
 
-
 # Valid Launchpad bug statuses and importances
 VALID_STATUSES = [
-    "New", "Incomplete", "Opinion", "Invalid", "Won't Fix",
-    "Confirmed", "Triaged", "In Progress", "Fix Committed", "Fix Released",
+    "New",
+    "Incomplete",
+    "Opinion",
+    "Invalid",
+    "Won't Fix",
+    "Confirmed",
+    "Triaged",
+    "In Progress",
+    "Fix Committed",
+    "Fix Released",
 ]
 
 VALID_IMPORTANCES = [
-    "Critical", "High", "Medium", "Low", "Wishlist", "Undecided",
+    "Critical",
+    "High",
+    "Medium",
+    "Low",
+    "Wishlist",
+    "Undecided",
 ]
 
 
@@ -45,10 +57,17 @@ def _to_utc_datetime(d):
     return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
 
 
-def search_bugs(project_name, status=None, importance=None,
-                created_since=None, created_before=None,
-                modified_since=None,
-                tags=None, search_text=None, max_results=50):
+def search_bugs(
+    project_name,
+    status=None,
+    importance=None,
+    created_since=None,
+    created_before=None,
+    modified_since=None,
+    tags=None,
+    search_text=None,
+    max_results=50,
+):
     """Search bugs on a project with filters."""
     project = get_project(project_name)
 
@@ -74,22 +93,23 @@ def search_bugs(project_name, status=None, importance=None,
         if i >= max_results:
             break
         bug = task.bug
-        results.append({
-            "id": bug.id,
-            "title": bug.title,
-            "status": task.status,
-            "importance": task.importance,
-            "assignee": task.assignee.display_name if task.assignee else "Unassigned",
-            "created": bug.date_created,
-            "updated": bug.date_last_updated,
-            "tags": list(bug.tags),
-            "web_link": bug.web_link,
-        })
+        results.append(
+            {
+                "id": bug.id,
+                "title": bug.title,
+                "status": task.status,
+                "importance": task.importance,
+                "assignee": task.assignee.display_name if task.assignee else "Unassigned",
+                "created": bug.date_created,
+                "updated": bug.date_last_updated,
+                "tags": list(bug.tags),
+                "web_link": bug.web_link,
+            }
+        )
     return results
 
 
-def update_bug(bug_id, project_name, status=None, importance=None,
-               assignee=None, tags=None):
+def update_bug(bug_id, project_name, status=None, importance=None, assignee=None, tags=None):
     """Update an existing bug's status, importance, assignee, or tags."""
     lp = get_launchpad()
     bug = lp.bugs[bug_id]

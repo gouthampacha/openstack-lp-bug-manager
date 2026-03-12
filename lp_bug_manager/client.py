@@ -9,9 +9,7 @@ def get_launchpad():
     """Get a cached, authenticated Launchpad client."""
     global _lp
     if _lp is None:
-        _lp = Launchpad.login_with(
-            "openstack-lp-bug-manager", "production", version="devel"
-        )
+        _lp = Launchpad.login_with("openstack-lp-bug-manager", "production", version="devel")
     return _lp
 
 

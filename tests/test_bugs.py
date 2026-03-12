@@ -4,8 +4,12 @@ from datetime import date, datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from lp_bug_manager.bugs import (
-    file_bug, search_bugs, update_bug, add_gerrit_link, get_bug,
     _to_utc_datetime,
+    add_gerrit_link,
+    file_bug,
+    get_bug,
+    search_bugs,
+    update_bug,
 )
 from tests.conftest import make_bug
 
@@ -45,8 +49,7 @@ class TestFileBug:
         bug, task = make_bug(124, "Important bug")
         lp.bugs.createBug.return_value = bug
 
-        file_bug("manila", "Important bug", "desc",
-                 importance="High", status="Triaged")
+        file_bug("manila", "Important bug", "desc", importance="High", status="Triaged")
 
         assert task.importance == "High"
         assert task.status == "Triaged"
@@ -72,8 +75,9 @@ class TestSearchBugs:
         project = MagicMock()
         mock_get_project.return_value = project
 
-        bug, task = make_bug(200, "Found bug", status="New",
-                             importance="Medium", assignee="gouthamr")
+        bug, task = make_bug(
+            200, "Found bug", status="New", importance="Medium", assignee="gouthamr"
+        )
         project.searchTasks.return_value = [task]
 
         results = search_bugs("manila", status="New")
@@ -143,6 +147,7 @@ class TestUpdateBug:
         lp.bugs.__getitem__.return_value = bug
 
         import pytest
+
         with pytest.raises(ValueError, match="no task for project manila"):
             update_bug(401, "manila", status="Triaged")
 
@@ -168,8 +173,9 @@ class TestAddGerritLink:
         bug, _ = make_bug(501, "Bug")
         lp.bugs.__getitem__.return_value = bug
 
-        add_gerrit_link(501, "https://review.opendev.org/c/123",
-                        comment="Fix for the share export issue")
+        add_gerrit_link(
+            501, "https://review.opendev.org/c/123", comment="Fix for the share export issue"
+        )
 
         msg = bug.newMessage.call_args[1]["content"]
         assert "Fix for the share export issue" in msg
@@ -181,9 +187,15 @@ class TestGetBug:
     def test_returns_bug_details(self, mock_lp):
         lp = MagicMock()
         mock_lp.return_value = lp
-        bug, task = make_bug(600, "Detailed bug", status="Triaged",
-                             importance="High", assignee="gouthamr",
-                             tags=["rfe"], description="Full description")
+        bug, task = make_bug(
+            600,
+            "Detailed bug",
+            status="Triaged",
+            importance="High",
+            assignee="gouthamr",
+            tags=["rfe"],
+            description="Full description",
+        )
         lp.bugs.__getitem__.return_value = bug
 
         result = get_bug(600)

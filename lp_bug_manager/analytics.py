@@ -32,16 +32,17 @@ def bugs_fixed_in_cycle(project_name, cycle_id):
     if cycle is None:
         raise ValueError(f"Unknown release cycle: {cycle_id}")
 
-    end_dt = datetime(cycle["end"].year, cycle["end"].month,
-                      cycle["end"].day, tzinfo=timezone.utc)
+    end_dt = datetime(cycle["end"].year, cycle["end"].month, cycle["end"].day, tzinfo=timezone.utc)
     fixed = []
     for status in ["Fix Committed", "Fix Released"]:
-        fixed.extend(search_bugs(
-            project_name,
-            status=status,
-            modified_since=cycle["start"],
-            max_results=500,
-        ))
+        fixed.extend(
+            search_bugs(
+                project_name,
+                status=status,
+                modified_since=cycle["start"],
+                max_results=500,
+            )
+        )
 
     return [b for b in fixed if b["updated"] <= end_dt]
 
@@ -49,8 +50,7 @@ def bugs_fixed_in_cycle(project_name, cycle_id):
 def rotten_bugs(project_name, days=180):
     """Find bugs open or incomplete with no activity for N days."""
     cutoff = date.today() - timedelta(days=days)
-    cutoff_dt = datetime(cutoff.year, cutoff.month, cutoff.day,
-                         tzinfo=timezone.utc)
+    cutoff_dt = datetime(cutoff.year, cutoff.month, cutoff.day, tzinfo=timezone.utc)
     results = []
     for status in ["New", "Incomplete", "Confirmed", "Triaged"]:
         bugs = search_bugs(
@@ -80,23 +80,29 @@ def scrub_report(project_name, days=None, stale_days=30):
 
     recent_window = date.today() - timedelta(days=7)
 
-    new_bugs = search_bugs(project_name, status="New",
-                           created_since=created_since, max_results=100)
-    incomplete = search_bugs(project_name, status="Incomplete",
-                             created_since=created_since, max_results=100)
+    new_bugs = search_bugs(
+        project_name, status="New", created_since=created_since, max_results=100
+    )
+    incomplete = search_bugs(
+        project_name, status="Incomplete", created_since=created_since, max_results=100
+    )
 
     unassigned_triaged = [
-        b for b in search_bugs(project_name, status=["Confirmed", "Triaged"],
-                               created_since=created_since, max_results=200)
+        b
+        for b in search_bugs(
+            project_name,
+            status=["Confirmed", "Triaged"],
+            created_since=created_since,
+            max_results=200,
+        )
         if b["assignee"] == "Unassigned"
     ]
 
-    stale_cutoff = datetime(*(date.today() - timedelta(days=stale_days)).timetuple()[:3],
-                            tzinfo=timezone.utc)
+    stale_cutoff = datetime(
+        *(date.today() - timedelta(days=stale_days)).timetuple()[:3], tzinfo=timezone.utc
+    )
     in_progress = search_bugs(project_name, status="In Progress", max_results=200)
-    stale_in_progress = [
-        b for b in in_progress if b["updated"] < stale_cutoff
-    ]
+    stale_in_progress = [b for b in in_progress if b["updated"] < stale_cutoff]
     for b in stale_in_progress:
         b["days_inactive"] = (datetime.now(timezone.utc) - b["updated"]).days
 
@@ -156,8 +162,6 @@ def cycle_summary(project_name, cycle_id):
         "still_open": still_open,
         "importance_breakdown": importance_counts,
         "status_breakdown": status_counts,
-        "top_reporters": sorted(assignee_counts.items(),
-                                key=lambda x: x[1], reverse=True),
-        "top_fixers": sorted(fixer_counts.items(),
-                             key=lambda x: x[1], reverse=True),
+        "top_reporters": sorted(assignee_counts.items(), key=lambda x: x[1], reverse=True),
+        "top_fixers": sorted(fixer_counts.items(), key=lambda x: x[1], reverse=True),
     }
