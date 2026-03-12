@@ -11,7 +11,7 @@ class TestGetCycle:
         assert version == "2026.1"
         assert cycle["name"] == "Gazpacho"
         assert cycle["start"] == date(2025, 10, 1)
-        assert cycle["end"] == date(2026, 4, 1)
+        assert cycle["end"] == date(2026, 4, 2)
 
     def test_lookup_by_codename(self):
         version, cycle = get_cycle("Gazpacho")
@@ -34,6 +34,7 @@ class TestListCycles:
         assert "2025.1" in cycles
         assert "2025.2" in cycles
         assert "2026.1" in cycles
+        assert "2026.2" in cycles
 
     def test_cycle_has_required_fields(self):
         cycles = list_cycles()

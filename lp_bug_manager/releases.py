@@ -18,7 +18,12 @@ RELEASE_CYCLES = {
     "2026.1": {
         "name": "Gazpacho",
         "start": date(2025, 10, 1),
-        "end": date(2026, 4, 1),
+        "end": date(2026, 4, 2),
+    },
+    "2026.2": {
+        "name": "Hibiscus",
+        "start": date(2026, 4, 2),
+        "end": date(2026, 9, 30),
     },
 }
 
