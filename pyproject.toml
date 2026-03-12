@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openstack-lp-bug-manager"
+version = "0.1.0"
+description = "CLI tool for OpenStack maintainers to manage Launchpad bugs"
+requires-python = ">=3.9"
+dependencies = [
+    "launchpadlib",
+    "click",
+    "prettytable",
+    "keyring",
+]
+
+[project.scripts]
+lp-bug = "lp_bug_manager.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lp_bug_manager*"]
