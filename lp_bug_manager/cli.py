@@ -11,28 +11,62 @@ from lp_bug_manager.releases import list_cycles, get_cycle
 DEFAULT_PROJECTS = ["manila", "manila-ui", "python-manilaclient"]
 
 
-def _bug_table(bug_list, show_inactive=False):
+def _parse_projects(project, all_projects):
+    """Return list of projects to query."""
+    if all_projects:
+        return DEFAULT_PROJECTS
+    return [project]
+
+
+def _bug_table(bug_list, show_inactive=False, show_project=False):
     """Format a list of bugs as a PrettyTable."""
     t = PrettyTable()
-    fields = ["ID", "Title", "Status", "Importance", "Assignee", "Updated"]
+    fields = ["ID"]
+    if show_project:
+        fields.append("Project")
+    fields.extend(["Title", "Status", "Importance", "Assignee", "Updated"])
     if show_inactive:
         fields.append("Days Inactive")
     t.field_names = fields
     t.align["Title"] = "l"
-    t.max_width["Title"] = 60
+    t.max_width["Title"] = 55
 
     for b in bug_list:
-        row = [
-            b["id"],
-            b["title"][:60],
+        row = [b["id"]]
+        if show_project:
+            row.append(b.get("project", ""))
+        row.extend([
+            b["title"][:55],
             b["status"],
             b["importance"],
             b["assignee"],
             b["updated"].strftime("%Y-%m-%d"),
-        ]
+        ])
         if show_inactive:
             row.append(b.get("days_inactive", ""))
         t.add_row(row)
+    return t
+
+
+def _search_multi(projects, **kwargs):
+    """Search across multiple projects, tagging results with project name."""
+    all_results = []
+    for proj in projects:
+        results = bugs.search_bugs(proj, **kwargs)
+        for b in results:
+            b["project"] = proj
+        all_results.extend(results)
+    return all_results
+
+
+def _kv_table(data, col1="", col2=""):
+    """Simple two-column table."""
+    t = PrettyTable()
+    t.field_names = [col1, col2]
+    t.align[col1] = "l"
+    t.align[col2] = "r"
+    for k, v in data:
+        t.add_row([k, v])
     return t
 
 
@@ -187,6 +221,113 @@ def rotten(project, days):
     click.echo(f"Rotten bugs on {project} (no activity for {days}+ days): {len(result)}")
     if result:
         click.echo(_bug_table(result, show_inactive=True))
+
+
+# -- scrub --
+@main.command("scrub")
+@click.argument("project", required=False)
+@click.option("--all", "all_projects", is_flag=True, help="Run across all Manila projects")
+@click.option("--days", "-d", default=None, type=int,
+              help="Only show bugs created in the last N days")
+@click.option("--stale-days", default=30, type=int,
+              help="Threshold for stale In Progress bugs (default: 30)")
+def scrub(project, all_projects, days, stale_days):
+    """Weekly bug scrub agenda. Shows untriaged, unassigned, stale, and recent bugs."""
+    if not project and not all_projects:
+        all_projects = True
+    projects = _parse_projects(project, all_projects)
+    multi = len(projects) > 1
+
+    for proj in projects:
+        if multi:
+            click.echo(click.style(f"\n{'=' * 60}", bold=True))
+            click.echo(click.style(f"  {proj}", bold=True))
+            click.echo(click.style(f"{'=' * 60}", bold=True))
+
+        report = analytics.scrub_report(proj, days=days, stale_days=stale_days)
+
+        click.echo(click.style(f"\n-- New / Untriaged ({len(report['new'])}) --", fg="red"))
+        if report["new"]:
+            click.echo(_bug_table(report["new"]))
+        else:
+            click.echo("  None")
+
+        click.echo(click.style(f"\n-- Incomplete ({len(report['incomplete'])}) --", fg="yellow"))
+        if report["incomplete"]:
+            click.echo(_bug_table(report["incomplete"]))
+        else:
+            click.echo("  None")
+
+        click.echo(click.style(f"\n-- Triaged but Unassigned ({len(report['unassigned_triaged'])}) --", fg="yellow"))
+        if report["unassigned_triaged"]:
+            click.echo(_bug_table(report["unassigned_triaged"]))
+        else:
+            click.echo("  None")
+
+        click.echo(click.style(f"\n-- Stale In Progress (30+ days) ({len(report['stale_in_progress'])}) --", fg="red"))
+        if report["stale_in_progress"]:
+            click.echo(_bug_table(report["stale_in_progress"], show_inactive=True))
+        else:
+            click.echo("  None")
+
+        click.echo(click.style(f"\n-- Reported This Week ({len(report['recent'])}) --", fg="green"))
+        if report["recent"]:
+            click.echo(_bug_table(report["recent"]))
+        else:
+            click.echo("  None")
+
+    click.echo()
+
+
+# -- summary --
+@main.command("summary")
+@click.argument("cycle")
+@click.argument("project", required=False)
+@click.option("--all", "all_projects", is_flag=True, help="Run across all Manila projects")
+def summary(cycle, project, all_projects):
+    """Release cycle retrospective summary for CYCLE (e.g., Gazpacho)."""
+    if not project and not all_projects:
+        all_projects = True
+    projects = _parse_projects(project, all_projects)
+
+    for proj in projects:
+        s = analytics.cycle_summary(proj, cycle)
+
+        click.echo(click.style(
+            f"\n{'=' * 60}", bold=True))
+        click.echo(click.style(
+            f"  {proj} -- {s['cycle']['name']} ({s['version']})", bold=True))
+        click.echo(click.style(
+            f"  {s['cycle']['start']} to {s['cycle']['end']}", bold=True))
+        click.echo(click.style(
+            f"{'=' * 60}", bold=True))
+
+        click.echo(f"\n  Bugs reported:   {s['reported_count']}")
+        click.echo(f"  Bugs fixed:      {s['fixed_count']}")
+        click.echo(f"  Still open:      {len(s['still_open'])}")
+
+        if s["importance_breakdown"]:
+            click.echo(click.style("\n-- By Importance --", fg="cyan"))
+            click.echo(_kv_table(
+                sorted(s["importance_breakdown"].items()),
+                "Importance", "Count"))
+
+        if s["status_breakdown"]:
+            click.echo(click.style("\n-- By Current Status --", fg="cyan"))
+            click.echo(_kv_table(
+                sorted(s["status_breakdown"].items()),
+                "Status", "Count"))
+
+        if s["top_fixers"]:
+            click.echo(click.style("\n-- Top Fixers --", fg="green"))
+            click.echo(_kv_table(s["top_fixers"][:10], "Assignee", "Fixed"))
+
+        if s["still_open"]:
+            click.echo(click.style(
+                f"\n-- Still Open ({len(s['still_open'])}) --", fg="yellow"))
+            click.echo(_bug_table(s["still_open"]))
+
+    click.echo()
 
 
 # -- releases --
