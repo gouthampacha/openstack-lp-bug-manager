@@ -178,6 +178,33 @@ class TestUpdateBug:
             update_bug(403, "manila", milestone="nonexistent")
 
     @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_no_project_single_task(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, task = make_bug(404, "Single task bug", target="manila")
+        lp.bugs.__getitem__.return_value = bug
+
+        update_bug(404, status="Triaged")
+
+        assert task.status == "Triaged"
+        task.lp_save.assert_called_once()
+
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_no_project_multiple_tasks_raises(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, task1 = make_bug(405, "Multi task bug", target="manila")
+        task2 = MagicMock()
+        task2.bug_target_name = "manila-ui"
+        bug.bug_tasks = [task1, task2]
+        lp.bugs.__getitem__.return_value = bug
+
+        import pytest
+
+        with pytest.raises(ValueError, match="multiple projects"):
+            update_bug(405, status="Triaged")
+
+    @patch("lp_bug_manager.bugs.get_launchpad")
     def test_wrong_project_raises(self, mock_lp):
         lp = MagicMock()
         mock_lp.return_value = lp

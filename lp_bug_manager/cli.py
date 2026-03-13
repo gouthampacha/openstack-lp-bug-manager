@@ -171,7 +171,7 @@ def search(project, status, importance, tag, text, since, before, max_results):
 # -- update --
 @main.command("update")
 @click.argument("bug_id", type=int)
-@click.argument("project")
+@click.argument("project", required=False)
 @click.option("--status", "-s", type=click.Choice(bugs.VALID_STATUSES, case_sensitive=False))
 @click.option(
     "--importance", "-i", type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False)
@@ -181,15 +181,29 @@ def search(project, status, importance, tag, text, since, before, max_results):
 @click.option("--tag", "-t", multiple=True, help="Set tags (replaces existing)")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
 def update(bug_id, project, status, importance, assignee, milestone, tag, yes):
-    """Update bug BUG_ID on PROJECT."""
-    from lp_bug_manager.client import get_project
+    """Update bug BUG_ID on PROJECT.
+
+    PROJECT is optional when the bug has only one task. If the bug spans
+    multiple projects, specify which one to update.
+    """
+    from lp_bug_manager.client import get_project as get_lp_project
+
+    # Resolve the project name early if we need it for milestone checks
+    resolved_project = project
+    if milestone and not resolved_project:
+        from lp_bug_manager.client import get_launchpad
+
+        lp = get_launchpad()
+        bug_obj = lp.bugs[bug_id]
+        task = bugs._resolve_task(bug_obj, None)
+        resolved_project = task.bug_target_name
 
     reactivated = False
     if milestone:
-        lp_project = get_project(project)
+        lp_project = get_lp_project(resolved_project)
         ms = lp_project.getMilestone(name=milestone)
         if ms is None:
-            raise click.ClickException(f"Milestone '{milestone}' not found on {project}")
+            raise click.ClickException(f"Milestone '{milestone}' not found on {resolved_project}")
         if not ms.is_active:
             if not yes and not click.confirm(
                 f"Milestone '{milestone}' is inactive. Temporarily activate it to target this bug?"

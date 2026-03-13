@@ -109,21 +109,41 @@ def search_bugs(
     return results
 
 
+def _resolve_task(bug, project_name=None):
+    """Find the bug task for a project.
+
+    If project_name is None and the bug has exactly one task, return it.
+    Raises ValueError if the task can't be resolved unambiguously.
+    """
+    tasks = list(bug.bug_tasks)
+    if project_name is None:
+        if len(tasks) == 1:
+            return tasks[0]
+        targets = [t.bug_target_name for t in tasks]
+        raise ValueError(
+            f"Bug {bug.id} has tasks on multiple projects: {', '.join(targets)}. "
+            f"Specify a project to disambiguate."
+        )
+    for t in tasks:
+        if project_name in t.bug_target_name:
+            return t
+    raise ValueError(f"Bug {bug.id} has no task for project {project_name}")
+
+
 def update_bug(
-    bug_id, project_name, status=None, importance=None, assignee=None, milestone=None, tags=None
+    bug_id,
+    project_name=None,
+    status=None,
+    importance=None,
+    assignee=None,
+    milestone=None,
+    tags=None,
 ):
     """Update an existing bug's status, importance, assignee, milestone, or tags."""
     lp = get_launchpad()
     bug = lp.bugs[bug_id]
-
-    # Find the bug task for this project
-    task = None
-    for t in bug.bug_tasks:
-        if project_name in t.bug_target_name:
-            task = t
-            break
-    if task is None:
-        raise ValueError(f"Bug {bug_id} has no task for project {project_name}")
+    task = _resolve_task(bug, project_name)
+    project_name = task.bug_target_name
 
     if status:
         task.status = status

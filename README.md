@@ -143,14 +143,17 @@ lp-bug show 2144047
 # File a new bug
 lp-bug file manila-ui "Something is broken" -d "Steps to reproduce..." -i Medium
 
-# Update a bug
+# Update a bug (project is optional when the bug has a single task)
+lp-bug update 2144047 --status Triaged --importance Medium
+
+# Specify the project when a bug spans multiple projects
 lp-bug update 2144047 manila-ui --status Triaged --importance Medium
 
 # Target a bug to a milestone
-lp-bug update 2144047 manila --milestone gazpacho-rc1
+lp-bug update 2144047 --milestone gazpacho-rc1
 
 # Target to an inactive milestone (prompts to temporarily reactivate)
-lp-bug update 2144047 manila --milestone gazpacho-2 --yes
+lp-bug update 2144047 --milestone gazpacho-2 --yes
 
 # Link a Gerrit review to a bug
 lp-bug link-gerrit 2144047 https://review.opendev.org/c/openstack/manila-ui/+/976962
