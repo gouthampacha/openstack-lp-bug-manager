@@ -98,6 +98,22 @@ lp-bug create-release Hibiscus
 Existing series and milestones are skipped, so the command is safe to
 run repeatedly.
 
+### Retargeting bugs between milestones
+
+Move all open bugs from one milestone to another -- useful at milestone
+boundaries when carrying over unfinished work.
+
+```
+# Preview what would move
+lp-bug retarget manila gazpacho-3 --to gazpacho-rc1 --dry-run
+
+# Retarget and list affected bugs
+lp-bug retarget manila gazpacho-3 --to gazpacho-rc1
+
+# Retarget and deactivate the old milestone
+lp-bug retarget manila gazpacho-3 --to gazpacho-rc1 --deactivate
+```
+
 ### Other commands
 
 ```
