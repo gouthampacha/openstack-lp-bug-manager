@@ -93,6 +93,94 @@ class TestShow:
         assert "ui, locks" in result.output
 
 
+class TestUpdate:
+    @patch("lp_bug_manager.cli.bugs.update_bug")
+    @patch("lp_bug_manager.client.get_project")
+    def test_inactive_milestone_prompts(self, mock_get_project, mock_update, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        ms = MagicMock()
+        ms.is_active = False
+        project.getMilestone.return_value = ms
+
+        mock_bug = MagicMock()
+        mock_bug.id = 100
+        mock_bug.web_link = "https://bugs.launchpad.net/manila/+bug/100"
+        mock_update.return_value = mock_bug
+
+        result = runner.invoke(
+            main, ["update", "100", "manila", "--milestone", "gazpacho-2"], input="y\n"
+        )
+        assert result.exit_code == 0
+        assert "inactive" in result.output
+        assert "deactivated again" in result.output
+        # Activated then deactivated
+        assert ms.is_active is False
+        assert ms.lp_save.call_count == 2
+
+    @patch("lp_bug_manager.cli.bugs.update_bug")
+    @patch("lp_bug_manager.client.get_project")
+    def test_inactive_milestone_abort(self, mock_get_project, mock_update, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        ms = MagicMock()
+        ms.is_active = False
+        project.getMilestone.return_value = ms
+
+        result = runner.invoke(
+            main, ["update", "100", "manila", "--milestone", "gazpacho-2"], input="n\n"
+        )
+        assert result.exit_code == 0
+        assert "Aborted" in result.output
+        mock_update.assert_not_called()
+
+    @patch("lp_bug_manager.cli.bugs.update_bug")
+    @patch("lp_bug_manager.client.get_project")
+    def test_inactive_milestone_yes_flag(self, mock_get_project, mock_update, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        ms = MagicMock()
+        ms.is_active = False
+        project.getMilestone.return_value = ms
+
+        mock_bug = MagicMock()
+        mock_bug.id = 100
+        mock_bug.web_link = "https://bugs.launchpad.net/manila/+bug/100"
+        mock_update.return_value = mock_bug
+
+        result = runner.invoke(
+            main, ["update", "100", "manila", "--milestone", "gazpacho-2", "--yes"]
+        )
+        assert result.exit_code == 0
+        assert "Temporarily activate" not in result.output
+        assert "deactivated again" in result.output
+        mock_update.assert_called_once()
+
+    @patch("lp_bug_manager.cli.bugs.update_bug")
+    @patch("lp_bug_manager.client.get_project")
+    def test_active_milestone_no_prompt(self, mock_get_project, mock_update, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        ms = MagicMock()
+        ms.is_active = True
+        project.getMilestone.return_value = ms
+
+        mock_bug = MagicMock()
+        mock_bug.id = 100
+        mock_bug.web_link = "https://bugs.launchpad.net/manila/+bug/100"
+        mock_update.return_value = mock_bug
+
+        result = runner.invoke(main, ["update", "100", "manila", "--milestone", "gazpacho-3"])
+        assert result.exit_code == 0
+        assert "inactive" not in result.output
+        assert "deactivated" not in result.output
+        ms.lp_save.assert_not_called()
+
+
 class TestScrub:
     @patch("lp_bug_manager.cli.analytics.scrub_report")
     def test_single_project(self, mock_scrub, runner):

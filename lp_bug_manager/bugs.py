@@ -109,8 +109,10 @@ def search_bugs(
     return results
 
 
-def update_bug(bug_id, project_name, status=None, importance=None, assignee=None, tags=None):
-    """Update an existing bug's status, importance, assignee, or tags."""
+def update_bug(
+    bug_id, project_name, status=None, importance=None, assignee=None, milestone=None, tags=None
+):
+    """Update an existing bug's status, importance, assignee, milestone, or tags."""
     lp = get_launchpad()
     bug = lp.bugs[bug_id]
 
@@ -129,7 +131,13 @@ def update_bug(bug_id, project_name, status=None, importance=None, assignee=None
         task.importance = importance
     if assignee:
         task.assignee = lp.people[assignee]
-    if status or importance or assignee:
+    if milestone:
+        project = get_project(project_name)
+        ms = project.getMilestone(name=milestone)
+        if ms is None:
+            raise ValueError(f"Milestone '{milestone}' not found on {project_name}")
+        task.milestone = ms
+    if status or importance or assignee or milestone:
         task.lp_save()
 
     if tags is not None:

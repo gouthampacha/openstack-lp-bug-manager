@@ -141,6 +141,42 @@ class TestUpdateBug:
         assert task.status == "Triaged"
         task.lp_save.assert_called_once()
 
+    @patch("lp_bug_manager.bugs.get_project")
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_sets_milestone(self, mock_lp, mock_get_project):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, task = make_bug(402, "Bug to target", target="manila")
+        lp.bugs.__getitem__.return_value = bug
+
+        project = MagicMock()
+        mock_get_project.return_value = project
+        ms = MagicMock()
+        project.getMilestone.return_value = ms
+
+        update_bug(402, "manila", milestone="gazpacho-rc1")
+
+        project.getMilestone.assert_called_once_with(name="gazpacho-rc1")
+        assert task.milestone == ms
+        task.lp_save.assert_called_once()
+
+    @patch("lp_bug_manager.bugs.get_project")
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_unknown_milestone_raises(self, mock_lp, mock_get_project):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, task = make_bug(403, "Bug", target="manila")
+        lp.bugs.__getitem__.return_value = bug
+
+        project = MagicMock()
+        mock_get_project.return_value = project
+        project.getMilestone.return_value = None
+
+        import pytest
+
+        with pytest.raises(ValueError, match="not found"):
+            update_bug(403, "manila", milestone="nonexistent")
+
     @patch("lp_bug_manager.bugs.get_launchpad")
     def test_wrong_project_raises(self, mock_lp):
         lp = MagicMock()

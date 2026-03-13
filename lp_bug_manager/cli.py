@@ -177,18 +177,44 @@ def search(project, status, importance, tag, text, since, before, max_results):
     "--importance", "-i", type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False)
 )
 @click.option("--assignee", "-a", default=None, help="Launchpad username")
+@click.option("--milestone", "-m", default=None, help="Target milestone name")
 @click.option("--tag", "-t", multiple=True, help="Set tags (replaces existing)")
-def update(bug_id, project, status, importance, assignee, tag):
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
+def update(bug_id, project, status, importance, assignee, milestone, tag, yes):
     """Update bug BUG_ID on PROJECT."""
+    from lp_bug_manager.client import get_project
+
+    reactivated = False
+    if milestone:
+        lp_project = get_project(project)
+        ms = lp_project.getMilestone(name=milestone)
+        if ms is None:
+            raise click.ClickException(f"Milestone '{milestone}' not found on {project}")
+        if not ms.is_active:
+            if not yes and not click.confirm(
+                f"Milestone '{milestone}' is inactive. Temporarily activate it to target this bug?"
+            ):
+                click.echo("Aborted.")
+                return
+            ms.is_active = True
+            ms.lp_save()
+            reactivated = True
+
     bug = bugs.update_bug(
         bug_id,
         project,
         status=status,
         importance=importance,
         assignee=assignee,
+        milestone=milestone,
         tags=list(tag) if tag else None,
     )
     click.echo(f"Updated bug #{bug.id}: {bug.web_link}")
+
+    if reactivated:
+        ms.is_active = False
+        ms.lp_save()
+        click.echo(f"Milestone '{milestone}' deactivated again.")
 
 
 # -- link-gerrit --
