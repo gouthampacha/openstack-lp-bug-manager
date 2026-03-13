@@ -423,6 +423,43 @@ def create_release(cycle, project, all_projects, dry_run):
     click.echo()
 
 
+# -- retarget --
+@main.command("retarget")
+@click.argument("project")
+@click.argument("from_milestone")
+@click.option("--to", "to_milestone", required=True, help="Target milestone name")
+@click.option(
+    "--deactivate", is_flag=True, help="Deactivate the source milestone after retargeting"
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be retargeted without doing it")
+def retarget(project, from_milestone, to_milestone, deactivate, dry_run):
+    """Retarget open bugs from FROM_MILESTONE to another milestone.
+
+    Moves all open bugs (New, Incomplete, Confirmed, Triaged, In Progress)
+    from FROM_MILESTONE to the milestone specified with --to.
+    """
+    retargeted = bugs.retarget_bugs(project, from_milestone, to_milestone, dry_run=dry_run)
+
+    if dry_run:
+        prefix = "Would retarget"
+    else:
+        prefix = "Retargeted"
+
+    click.echo(f"{prefix} {len(retargeted)} open bug(s) from {from_milestone} to {to_milestone}")
+
+    if retargeted:
+        click.echo(_bug_table(retargeted))
+
+    if deactivate:
+        if dry_run:
+            click.echo(f"\nWould deactivate milestone: {from_milestone}")
+        else:
+            bugs.deactivate_milestone(project, from_milestone)
+            click.echo(f"\nDeactivated milestone: {from_milestone}")
+
+    click.echo()
+
+
 # -- releases --
 @main.command("releases")
 def releases():

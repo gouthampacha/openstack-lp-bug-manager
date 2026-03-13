@@ -264,3 +264,69 @@ class TestCreateRelease:
         assert result.exit_code == 0
         # Should create 3 milestones (skipping hibiscus-1)
         assert series.newMilestone.call_count == 3
+
+
+class TestRetarget:
+    @patch("lp_bug_manager.cli.bugs.retarget_bugs")
+    def test_dry_run(self, mock_retarget, runner):
+        mock_retarget.return_value = [
+            make_search_result(800, "Open bug", status="Triaged", importance="Medium"),
+        ]
+        result = runner.invoke(
+            main, ["retarget", "manila", "gazpacho-2", "--to", "gazpacho-3", "--dry-run"]
+        )
+        assert result.exit_code == 0
+        assert "Would retarget 1 open bug(s)" in result.output
+        assert "800" in result.output
+        assert "Open bug" in result.output
+        mock_retarget.assert_called_once_with("manila", "gazpacho-2", "gazpacho-3", dry_run=True)
+
+    @patch("lp_bug_manager.cli.bugs.retarget_bugs")
+    def test_retargets_bugs(self, mock_retarget, runner):
+        mock_retarget.return_value = [
+            make_search_result(801, "Bug A"),
+            make_search_result(802, "Bug B"),
+        ]
+        result = runner.invoke(main, ["retarget", "manila", "gazpacho-2", "--to", "gazpacho-3"])
+        assert result.exit_code == 0
+        assert "Retargeted 2 open bug(s)" in result.output
+        assert "801" in result.output
+        assert "802" in result.output
+        mock_retarget.assert_called_once_with("manila", "gazpacho-2", "gazpacho-3", dry_run=False)
+
+    @patch("lp_bug_manager.cli.bugs.retarget_bugs")
+    def test_no_open_bugs(self, mock_retarget, runner):
+        mock_retarget.return_value = []
+        result = runner.invoke(main, ["retarget", "manila", "gazpacho-2", "--to", "gazpacho-3"])
+        assert result.exit_code == 0
+        assert "Retargeted 0 open bug(s)" in result.output
+
+    @patch("lp_bug_manager.cli.bugs.deactivate_milestone")
+    @patch("lp_bug_manager.cli.bugs.retarget_bugs")
+    def test_deactivate_flag(self, mock_retarget, mock_deactivate, runner):
+        mock_retarget.return_value = []
+        result = runner.invoke(
+            main,
+            ["retarget", "manila", "gazpacho-2", "--to", "gazpacho-3", "--deactivate"],
+        )
+        assert result.exit_code == 0
+        assert "Deactivated milestone: gazpacho-2" in result.output
+        mock_deactivate.assert_called_once_with("manila", "gazpacho-2")
+
+    @patch("lp_bug_manager.cli.bugs.retarget_bugs")
+    def test_deactivate_dry_run(self, mock_retarget, runner):
+        mock_retarget.return_value = []
+        result = runner.invoke(
+            main,
+            [
+                "retarget",
+                "manila",
+                "gazpacho-2",
+                "--to",
+                "gazpacho-3",
+                "--deactivate",
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Would deactivate milestone: gazpacho-2" in result.output

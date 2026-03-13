@@ -150,6 +150,58 @@ def add_gerrit_link(bug_id, gerrit_url, comment=None):
     return bug
 
 
+OPEN_STATUSES = ["New", "Incomplete", "Confirmed", "Triaged", "In Progress"]
+
+
+def retarget_bugs(project_name, from_milestone, to_milestone, dry_run=False):
+    """Move open bugs from one milestone to another.
+
+    Returns list of dicts describing the retargeted bugs.
+    """
+    project = get_project(project_name)
+
+    from_ms = project.getMilestone(name=from_milestone)
+    if from_ms is None:
+        raise ValueError(f"Milestone '{from_milestone}' not found on {project_name}")
+
+    to_ms = project.getMilestone(name=to_milestone)
+    if to_ms is None:
+        raise ValueError(f"Milestone '{to_milestone}' not found on {project_name}")
+
+    tasks = project.searchTasks(milestone=from_ms, status=OPEN_STATUSES)
+    retargeted = []
+    for task in tasks:
+        bug = task.bug
+        retargeted.append(
+            {
+                "id": bug.id,
+                "title": bug.title,
+                "status": task.status,
+                "importance": task.importance,
+                "assignee": task.assignee.display_name if task.assignee else "Unassigned",
+                "created": bug.date_created,
+                "updated": bug.date_last_updated,
+                "tags": list(bug.tags),
+                "web_link": bug.web_link,
+            }
+        )
+        if not dry_run:
+            task.milestone = to_ms
+            task.lp_save()
+
+    return retargeted
+
+
+def deactivate_milestone(project_name, milestone_name):
+    """Set a milestone as inactive."""
+    project = get_project(project_name)
+    ms = project.getMilestone(name=milestone_name)
+    if ms is None:
+        raise ValueError(f"Milestone '{milestone_name}' not found on {project_name}")
+    ms.is_active = False
+    ms.lp_save()
+
+
 def get_bug(bug_id):
     """Fetch a single bug by ID."""
     lp = get_launchpad()

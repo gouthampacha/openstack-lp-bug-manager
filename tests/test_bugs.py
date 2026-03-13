@@ -6,8 +6,10 @@ from unittest.mock import MagicMock, patch
 from lp_bug_manager.bugs import (
     _to_utc_datetime,
     add_gerrit_link,
+    deactivate_milestone,
     file_bug,
     get_bug,
+    retarget_bugs,
     search_bugs,
     update_bug,
 )
@@ -206,3 +208,119 @@ class TestGetBug:
         assert len(result["tasks"]) == 1
         assert result["tasks"][0]["status"] == "Triaged"
         assert result["tasks"][0]["assignee"] == "gouthamr"
+
+
+class TestRetargetBugs:
+    @patch("lp_bug_manager.bugs.get_project")
+    def test_retargets_open_bugs(self, mock_get_project):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        from_ms = MagicMock()
+        to_ms = MagicMock()
+        project.getMilestone.side_effect = lambda name: (
+            from_ms if name == "gazpacho-2" else to_ms
+        )
+
+        _, task1 = make_bug(700, "Open bug 1", status="Triaged", assignee="alice")
+        _, task2 = make_bug(701, "Open bug 2", status="In Progress", assignee="bob")
+        project.searchTasks.return_value = [task1, task2]
+
+        result = retarget_bugs("manila", "gazpacho-2", "gazpacho-3")
+
+        assert len(result) == 2
+        assert result[0]["id"] == 700
+        assert result[1]["id"] == 701
+        assert task1.milestone == to_ms
+        assert task2.milestone == to_ms
+        assert task1.lp_save.called
+        assert task2.lp_save.called
+
+    @patch("lp_bug_manager.bugs.get_project")
+    def test_dry_run_does_not_modify(self, mock_get_project):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        from_ms = MagicMock()
+        to_ms = MagicMock()
+        project.getMilestone.side_effect = lambda name: (
+            from_ms if name == "gazpacho-2" else to_ms
+        )
+
+        _, task = make_bug(702, "Bug to keep", status="New")
+        project.searchTasks.return_value = [task]
+
+        result = retarget_bugs("manila", "gazpacho-2", "gazpacho-3", dry_run=True)
+
+        assert len(result) == 1
+        task.lp_save.assert_not_called()
+
+    @patch("lp_bug_manager.bugs.get_project")
+    def test_unknown_from_milestone_raises(self, mock_get_project):
+        project = MagicMock()
+        mock_get_project.return_value = project
+        project.getMilestone.return_value = None
+
+        import pytest
+
+        with pytest.raises(ValueError, match="not found"):
+            retarget_bugs("manila", "nonexistent", "gazpacho-3")
+
+    @patch("lp_bug_manager.bugs.get_project")
+    def test_unknown_to_milestone_raises(self, mock_get_project):
+        project = MagicMock()
+        mock_get_project.return_value = project
+        from_ms = MagicMock()
+        project.getMilestone.side_effect = lambda name: (from_ms if name == "gazpacho-2" else None)
+
+        import pytest
+
+        with pytest.raises(ValueError, match="not found"):
+            retarget_bugs("manila", "gazpacho-2", "nonexistent")
+
+    @patch("lp_bug_manager.bugs.get_project")
+    def test_searches_with_open_statuses(self, mock_get_project):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        from_ms = MagicMock()
+        to_ms = MagicMock()
+        project.getMilestone.side_effect = lambda name: (
+            from_ms if name == "gazpacho-2" else to_ms
+        )
+        project.searchTasks.return_value = []
+
+        retarget_bugs("manila", "gazpacho-2", "gazpacho-3")
+
+        call_kwargs = project.searchTasks.call_args[1]
+        assert call_kwargs["milestone"] == from_ms
+        assert "New" in call_kwargs["status"]
+        assert "In Progress" in call_kwargs["status"]
+        assert "Fix Released" not in call_kwargs["status"]
+
+
+class TestDeactivateMilestone:
+    @patch("lp_bug_manager.bugs.get_project")
+    def test_deactivates(self, mock_get_project):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        ms = MagicMock()
+        ms.is_active = True
+        project.getMilestone.return_value = ms
+
+        deactivate_milestone("manila", "gazpacho-2")
+
+        assert ms.is_active is False
+        ms.lp_save.assert_called_once()
+
+    @patch("lp_bug_manager.bugs.get_project")
+    def test_unknown_milestone_raises(self, mock_get_project):
+        project = MagicMock()
+        mock_get_project.return_value = project
+        project.getMilestone.return_value = None
+
+        import pytest
+
+        with pytest.raises(ValueError, match="not found"):
+            deactivate_milestone("manila", "nonexistent")
