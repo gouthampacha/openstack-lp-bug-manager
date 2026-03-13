@@ -330,3 +330,90 @@ class TestRetarget:
         )
         assert result.exit_code == 0
         assert "Would deactivate milestone: gazpacho-2" in result.output
+
+
+class TestSetFocus:
+    @patch("lp_bug_manager.client.get_project")
+    def test_updates_focus(self, mock_get_project, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        current_series = MagicMock()
+        current_series.name = "gazpacho"
+        project.development_focus = current_series
+
+        new_series = MagicMock()
+        new_series.name = "hibiscus"
+        project.series = [current_series, new_series]
+
+        result = runner.invoke(main, ["set-focus", "manila", "hibiscus"], input="y\n")
+        assert result.exit_code == 0
+        assert "Current focus:     gazpacho" in result.output
+        assert "New focus:         hibiscus" in result.output
+        assert project.development_focus == new_series
+        project.lp_save.assert_called_once()
+
+    @patch("lp_bug_manager.client.get_project")
+    def test_yes_skips_prompt(self, mock_get_project, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        current_series = MagicMock()
+        current_series.name = "gazpacho"
+        project.development_focus = current_series
+
+        new_series = MagicMock()
+        new_series.name = "hibiscus"
+        project.series = [current_series, new_series]
+
+        result = runner.invoke(main, ["set-focus", "manila", "hibiscus", "--yes"])
+        assert result.exit_code == 0
+        assert "Update development focus?" not in result.output
+        assert project.development_focus == new_series
+        project.lp_save.assert_called_once()
+
+    @patch("lp_bug_manager.client.get_project")
+    def test_aborts_on_no(self, mock_get_project, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        current_series = MagicMock()
+        current_series.name = "gazpacho"
+        project.development_focus = current_series
+
+        new_series = MagicMock()
+        new_series.name = "hibiscus"
+        project.series = [current_series, new_series]
+
+        result = runner.invoke(main, ["set-focus", "manila", "hibiscus"], input="n\n")
+        assert result.exit_code == 0
+        assert "Aborted" in result.output
+        project.lp_save.assert_not_called()
+
+    @patch("lp_bug_manager.client.get_project")
+    def test_already_set(self, mock_get_project, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        current_series = MagicMock()
+        current_series.name = "hibiscus"
+        project.development_focus = current_series
+
+        result = runner.invoke(main, ["set-focus", "manila", "hibiscus"])
+        assert result.exit_code == 0
+        assert "already" in result.output
+        project.lp_save.assert_not_called()
+
+    @patch("lp_bug_manager.client.get_project")
+    def test_unknown_series_errors(self, mock_get_project, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        current_series = MagicMock()
+        current_series.name = "gazpacho"
+        project.development_focus = current_series
+        project.series = [current_series]
+
+        result = runner.invoke(main, ["set-focus", "manila", "nonexistent"])
+        assert result.exit_code != 0
+        assert "not found" in result.output

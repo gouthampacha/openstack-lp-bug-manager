@@ -460,6 +460,54 @@ def retarget(project, from_milestone, to_milestone, deactivate, dry_run):
     click.echo()
 
 
+# -- set-focus --
+@main.command("set-focus")
+@click.argument("project")
+@click.argument("series_name")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
+def set_focus(project, series_name, yes):
+    """Set the development focus of PROJECT to SERIES_NAME.
+
+    Shows the current development focus and prompts for confirmation
+    before updating.
+    """
+    from lp_bug_manager.client import get_project
+
+    lp_project = get_project(project)
+
+    current = lp_project.development_focus
+    current_name = current.name if current else "(none)"
+
+    if current_name == series_name.lower():
+        click.echo(f"Development focus for {project} is already '{current_name}'. Nothing to do.")
+        return
+
+    # Find the target series
+    target = None
+    for s in lp_project.series:
+        if s.name == series_name.lower():
+            target = s
+            break
+
+    if target is None:
+        raise click.ClickException(
+            f"Series '{series_name}' not found on {project}. "
+            f"Use 'create-release' to create it first."
+        )
+
+    click.echo(f"Project:           {project}")
+    click.echo(f"Current focus:     {current_name}")
+    click.echo(f"New focus:         {target.name}")
+
+    if not yes and not click.confirm("\nUpdate development focus?"):
+        click.echo("Aborted.")
+        return
+
+    lp_project.development_focus = target
+    lp_project.lp_save()
+    click.echo(f"Development focus for {project} set to '{target.name}'.")
+
+
 # -- releases --
 @main.command("releases")
 def releases():
