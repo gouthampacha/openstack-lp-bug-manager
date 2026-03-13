@@ -1,7 +1,7 @@
 """Tests for CLI commands."""
 
 from datetime import datetime, timezone
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -174,3 +174,93 @@ class TestSummary:
         }
         runner.invoke(main, ["summary", "Gazpacho"])
         assert mock_summary.call_count == 3
+
+
+def _mock_resolve(project_name, codename):
+    """Simulate openstack/releases lookup for test projects."""
+    models = {
+        "manila": ("cycle-with-rc", "service"),
+        "manila-ui": ("cycle-with-rc", "horizon-plugin"),
+        "python-manilaclient": ("cycle-with-intermediary", "client-library"),
+    }
+    return models.get(project_name, (None, None))
+
+
+@patch("lp_bug_manager.releases._resolve_release_info", side_effect=_mock_resolve)
+class TestCreateRelease:
+    def test_dry_run_shows_plan(self, mock_resolve, runner):
+        result = runner.invoke(main, ["create-release", "Hibiscus", "manila", "--dry-run"])
+        assert result.exit_code == 0
+        assert "Would create series: hibiscus (2026.2)" in result.output
+        assert "hibiscus-1" in result.output
+        assert "hibiscus-2" in result.output
+        assert "hibiscus-3" in result.output
+        assert "hibiscus-rc1" in result.output
+
+    def test_dry_run_manilaclient(self, mock_resolve, runner):
+        result = runner.invoke(
+            main, ["create-release", "Hibiscus", "python-manilaclient", "--dry-run"]
+        )
+        assert result.exit_code == 0
+        assert "hibiscus-client-release" in result.output
+        assert "hibiscus-3" not in result.output
+        assert "hibiscus-rc1" not in result.output
+
+    def test_dry_run_defaults_to_all_projects(self, mock_resolve, runner):
+        result = runner.invoke(main, ["create-release", "Hibiscus", "--dry-run"])
+        assert result.exit_code == 0
+        assert "manila\n" in result.output
+        assert "manila-ui" in result.output
+        assert "python-manilaclient" in result.output
+
+    def test_unknown_cycle_errors(self, mock_resolve, runner):
+        result = runner.invoke(main, ["create-release", "Nonexistent", "--dry-run"])
+        assert result.exit_code != 0
+        assert "Unknown release cycle" in result.output
+
+    @patch("lp_bug_manager.client.get_project")
+    def test_creates_series_and_milestones(self, mock_get_project, mock_resolve, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+        project.series = []
+
+        series = MagicMock()
+        project.newSeries.return_value = series
+        series.all_milestones = []
+
+        result = runner.invoke(main, ["create-release", "Hibiscus", "manila"])
+        assert result.exit_code == 0
+        project.newSeries.assert_called_once()
+        assert series.newMilestone.call_count == 4
+
+    @patch("lp_bug_manager.client.get_project")
+    def test_skips_existing_series(self, mock_get_project, mock_resolve, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+
+        existing_series = MagicMock()
+        existing_series.name = "hibiscus"
+        existing_series.all_milestones = []
+        project.series = [existing_series]
+
+        result = runner.invoke(main, ["create-release", "Hibiscus", "manila"])
+        assert result.exit_code == 0
+        assert "already exists, skipping creation" in result.output
+        project.newSeries.assert_not_called()
+
+    @patch("lp_bug_manager.client.get_project")
+    def test_skips_existing_milestones(self, mock_get_project, mock_resolve, runner):
+        project = MagicMock()
+        mock_get_project.return_value = project
+        project.series = []
+
+        series = MagicMock()
+        project.newSeries.return_value = series
+        existing_ms = MagicMock()
+        existing_ms.name = "hibiscus-1"
+        series.all_milestones = [existing_ms]
+
+        result = runner.invoke(main, ["create-release", "Hibiscus", "manila"])
+        assert result.exit_code == 0
+        # Should create 3 milestones (skipping hibiscus-1)
+        assert series.newMilestone.call_count == 3

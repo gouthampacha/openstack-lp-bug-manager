@@ -12,6 +12,8 @@ dependencies = [
     "click",
     "prettytable",
     "keyring",
+    "requests",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
