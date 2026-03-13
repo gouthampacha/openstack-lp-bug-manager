@@ -114,6 +114,19 @@ lp-bug retarget manila gazpacho-3 --to gazpacho-rc1
 lp-bug retarget manila gazpacho-3 --to gazpacho-rc1 --deactivate
 ```
 
+### Setting the development focus
+
+Switch a project's development focus to a different series. Shows the
+current focus and prompts for confirmation.
+
+```
+# Interactive confirmation
+lp-bug set-focus manila hibiscus
+
+# Skip the prompt
+lp-bug set-focus manila hibiscus --yes
+```
+
 ### Other commands
 
 ```
