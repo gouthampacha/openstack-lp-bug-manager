@@ -6,7 +6,7 @@ import click
 from prettytable import PrettyTable
 
 from lp_bug_manager import analytics, bugs
-from lp_bug_manager.releases import get_cycle, list_cycles
+from lp_bug_manager.releases import get_cycle, get_milestones_for_project, list_cycles
 
 DEFAULT_PROJECTS = ["manila", "manila-ui", "python-manilaclient"]
 
@@ -354,6 +354,71 @@ def summary(cycle, project, all_projects):
         if s["still_open"]:
             click.echo(click.style(f"\n-- Still Open ({len(s['still_open'])}) --", fg="yellow"))
             click.echo(_bug_table(s["still_open"]))
+
+    click.echo()
+
+
+# -- create-release --
+@main.command("create-release")
+@click.argument("cycle")
+@click.argument("project", required=False)
+@click.option("--all", "all_projects", is_flag=True, help="Create across all Manila projects")
+@click.option("--dry-run", is_flag=True, help="Show what would be created without doing it")
+def create_release(cycle, project, all_projects, dry_run):
+    """Create a release series and milestones on Launchpad for CYCLE.
+
+    Creates the series and its milestones with the correct dates.
+    Manila and manila-ui get milestones 1, 2, 3, and rc1.
+    python-manilaclient gets milestones 1, 2, and client-release.
+    """
+    from lp_bug_manager.client import get_project
+
+    version, info = get_cycle(cycle)
+    if info is None:
+        raise click.ClickException(f"Unknown release cycle: {cycle}")
+
+    if not project and not all_projects:
+        all_projects = True
+    projects = _parse_projects(project, all_projects)
+    codename = info["name"].lower()
+
+    for proj_name in projects:
+        click.echo(click.style(f"\n{proj_name}", bold=True))
+
+        milestones = get_milestones_for_project(proj_name, cycle)
+
+        if dry_run:
+            click.echo(f"  Would create series: {codename} ({version})")
+            click.echo(f"    Summary: The OpenStack {version} {info['name']} release cycle")
+            for ms_name, ms_date in milestones:
+                click.echo(f"  Would create milestone: {ms_name} ({ms_date})")
+            continue
+
+        lp_project = get_project(proj_name)
+
+        # Check if series already exists
+        existing = None
+        for s in lp_project.series:
+            if s.name == codename:
+                existing = s
+                break
+
+        if existing:
+            click.echo(f"  Series '{codename}' already exists, skipping creation")
+            series = existing
+        else:
+            summary = f"The OpenStack {version} {info['name']} release cycle"
+            series = lp_project.newSeries(name=codename, summary=summary)
+            click.echo(f"  Created series: {codename}")
+
+        # Create milestones
+        existing_ms = {m.name for m in series.all_milestones}
+        for ms_name, ms_date in milestones:
+            if ms_name in existing_ms:
+                click.echo(f"  Milestone '{ms_name}' already exists, skipping")
+                continue
+            series.newMilestone(name=ms_name, date_targeted=ms_date)
+            click.echo(f"  Created milestone: {ms_name} ({ms_date})")
 
     click.echo()
 
