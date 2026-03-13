@@ -179,8 +179,12 @@ def search(project, status, importance, tag, text, since, before, max_results):
 @click.option("--assignee", "-a", default=None, help="Launchpad username")
 @click.option("--milestone", "-m", default=None, help="Target milestone name")
 @click.option("--tag", "-t", multiple=True, help="Set tags (replaces existing)")
+@click.option("--add-tag", multiple=True, help="Add a tag (repeatable)")
+@click.option("--remove-tag", multiple=True, help="Remove a tag (repeatable)")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
-def update(bug_id, project, status, importance, assignee, milestone, tag, yes):
+def update(
+    bug_id, project, status, importance, assignee, milestone, tag, add_tag, remove_tag, yes
+):
     """Update bug BUG_ID on PROJECT.
 
     PROJECT is optional when the bug has only one task. If the bug spans
@@ -222,6 +226,8 @@ def update(bug_id, project, status, importance, assignee, milestone, tag, yes):
         assignee=assignee,
         milestone=milestone,
         tags=list(tag) if tag else None,
+        add_tags=list(add_tag) if add_tag else None,
+        remove_tags=list(remove_tag) if remove_tag else None,
     )
     click.echo(f"Updated bug #{bug.id}: {bug.web_link}")
 

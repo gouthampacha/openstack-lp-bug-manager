@@ -205,6 +205,56 @@ class TestUpdateBug:
             update_bug(405, status="Triaged")
 
     @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_add_tags(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, task = make_bug(406, "Tagged bug", target="manila", tags=["existing"])
+        lp.bugs.__getitem__.return_value = bug
+
+        update_bug(406, "manila", add_tags=["new-tag"])
+
+        assert "existing" in bug.tags
+        assert "new-tag" in bug.tags
+        bug.lp_save.assert_called_once()
+
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_remove_tags(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, task = make_bug(407, "Tagged bug", target="manila", tags=["keep", "remove-me"])
+        lp.bugs.__getitem__.return_value = bug
+
+        update_bug(407, "manila", remove_tags=["remove-me"])
+
+        assert "keep" in bug.tags
+        assert "remove-me" not in bug.tags
+        bug.lp_save.assert_called_once()
+
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_add_and_remove_tags(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, task = make_bug(408, "Bug", target="manila", tags=["a", "b"])
+        lp.bugs.__getitem__.return_value = bug
+
+        update_bug(408, "manila", add_tags=["c"], remove_tags=["a"])
+
+        assert sorted(bug.tags) == ["b", "c"]
+        bug.lp_save.assert_called_once()
+
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_tags_replace_overrides_add_remove(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, task = make_bug(409, "Bug", target="manila", tags=["old"])
+        lp.bugs.__getitem__.return_value = bug
+
+        update_bug(409, "manila", tags=["replaced"], add_tags=["ignored"])
+
+        assert bug.tags == ["replaced"]
+        bug.lp_save.assert_called_once()
+
+    @patch("lp_bug_manager.bugs.get_launchpad")
     def test_wrong_project_raises(self, mock_lp):
         lp = MagicMock()
         mock_lp.return_value = lp

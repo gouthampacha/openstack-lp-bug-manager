@@ -155,6 +155,10 @@ lp-bug update 2144047 --milestone gazpacho-rc1
 # Target to an inactive milestone (prompts to temporarily reactivate)
 lp-bug update 2144047 --milestone gazpacho-2 --yes
 
+# Add or remove tags without replacing existing ones
+lp-bug update 2144047 --add-tag rfe --add-tag netapp
+lp-bug update 2144047 --remove-tag stale
+
 # Link a Gerrit review to a bug
 lp-bug link-gerrit 2144047 https://review.opendev.org/c/openstack/manila-ui/+/976962
 ```

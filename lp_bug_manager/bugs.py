@@ -138,6 +138,8 @@ def update_bug(
     assignee=None,
     milestone=None,
     tags=None,
+    add_tags=None,
+    remove_tags=None,
 ):
     """Update an existing bug's status, importance, assignee, milestone, or tags."""
     lp = get_launchpad()
@@ -160,8 +162,22 @@ def update_bug(
     if status or importance or assignee or milestone:
         task.lp_save()
 
+    tags_changed = False
     if tags is not None:
         bug.tags = tags
+        tags_changed = True
+    else:
+        current = set(bug.tags)
+        if add_tags:
+            current.update(add_tags)
+            tags_changed = True
+        if remove_tags:
+            current -= set(remove_tags)
+            tags_changed = True
+        if tags_changed:
+            bug.tags = sorted(current)
+
+    if tags_changed:
         bug.lp_save()
 
     return bug
