@@ -36,7 +36,7 @@ pre-commit run --all-files
 lp_bug_manager/
     client.py      # Launchpad API authentication and connection
     bugs.py        # Bug CRUD operations (file, search, update, get)
-    releases.py    # OpenStack release cycle date ranges
+    releases.py    # Release cycles, milestone patterns (fetched from openstack/releases)
     analytics.py   # Scrub reports, cycle summaries, rotten bug detection
     cli.py         # Click CLI commands
     ...
@@ -62,9 +62,9 @@ during bug scrubs.
 configurable TTL would make repeated queries (like running `scrub`
 and then `summary` in the same meeting) much faster.
 
-**More release cycles.** The release cycle data in `releases.py` is
-manually maintained. It could be extended with older cycles, or
-potentially fetched from the OpenStack releases repository.
+**More release cycles.** The release cycle dates in `releases.py` are
+manually maintained. They could be extended with older cycles, or
+potentially parsed from the OpenStack releases repository.
 
 **Bug activity timeline.** Show the history of status changes on a bug,
 not just its current state. Useful for understanding how long bugs sat
@@ -78,6 +78,22 @@ in each status.
 3. Add tests -- mock the API layer and test both the logic and the
    CLI output using Click's `CliRunner`.
 4. Run `pytest -v` and `pre-commit run --all-files` before submitting.
+
+## openstack/releases dependency
+
+The `create-release` command and milestone pattern logic depend on the
+[openstack/releases](https://opendev.org/openstack/releases) repository.
+Each project has a deliverable YAML file per cycle at:
+
+```
+deliverables/{codename}/{project}.yaml
+```
+
+The `release-model` field (e.g., `cycle-with-rc`, `cycle-with-intermediary`)
+and `type` field (e.g., `service`, `client-library`) determine which
+milestones get created. This is fetched at runtime from opendev.org and
+cached in-process with `lru_cache`. Tests mock `_resolve_release_info`
+to avoid network calls.
 
 ## Launchpad API notes
 
