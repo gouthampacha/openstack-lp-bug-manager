@@ -76,6 +76,28 @@ To see which release cycles are available:
 lp-bug releases
 ```
 
+### Creating release milestones
+
+Create a release series and its milestones on Launchpad. The milestone
+pattern is determined automatically from the project's deliverable file
+in the `openstack/releases` repository -- `cycle-with-rc` projects get
+milestones 1, 2, 3, and rc1, while client libraries get 1, 2, and
+client-release.
+
+```
+# Preview what would be created
+lp-bug create-release Hibiscus manila-ui --dry-run
+
+# Create series and milestones for a single project
+lp-bug create-release Hibiscus manila
+
+# All three projects at once (default when no project given)
+lp-bug create-release Hibiscus
+```
+
+Existing series and milestones are skipped, so the command is safe to
+run repeatedly.
+
 ### Other commands
 
 ```
