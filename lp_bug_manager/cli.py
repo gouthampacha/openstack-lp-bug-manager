@@ -417,7 +417,7 @@ def create_release(cycle, project, all_projects, dry_run):
             if ms_name in existing_ms:
                 click.echo(f"  Milestone '{ms_name}' already exists, skipping")
                 continue
-            series.newMilestone(name=ms_name, date_targeted=ms_date)
+            series.newMilestone(name=ms_name, date_targeted=bugs._to_utc_datetime(ms_date))
             click.echo(f"  Created milestone: {ms_name} ({ms_date})")
 
     click.echo()
