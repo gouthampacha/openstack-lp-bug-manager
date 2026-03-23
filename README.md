@@ -159,6 +159,12 @@ lp-bug update 2144047 --milestone gazpacho-2 --yes
 lp-bug update 2144047 --add-tag rfe --add-tag netapp
 lp-bug update 2144047 --remove-tag stale
 
+# Unassign a bug
+lp-bug update 2144047 --unassign --status Triaged
+
+# Add a comment
+lp-bug update 2144047 --comment "Unassigning, no progress in 3 months."
+
 # Link a Gerrit review to a bug
 lp-bug link-gerrit 2144047 https://review.opendev.org/c/openstack/manila-ui/+/976962
 ```
