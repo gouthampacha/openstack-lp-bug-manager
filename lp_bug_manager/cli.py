@@ -177,13 +177,26 @@ def search(project, status, importance, tag, text, since, before, max_results):
     "--importance", "-i", type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False)
 )
 @click.option("--assignee", "-a", default=None, help="Launchpad username")
+@click.option("--unassign", is_flag=True, help="Remove the current assignee")
 @click.option("--milestone", "-m", default=None, help="Target milestone name")
 @click.option("--tag", "-t", multiple=True, help="Set tags (replaces existing)")
 @click.option("--add-tag", multiple=True, help="Add a tag (repeatable)")
 @click.option("--remove-tag", multiple=True, help="Remove a tag (repeatable)")
+@click.option("--comment", "-c", default=None, help="Add a comment to the bug")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
 def update(
-    bug_id, project, status, importance, assignee, milestone, tag, add_tag, remove_tag, yes
+    bug_id,
+    project,
+    status,
+    importance,
+    assignee,
+    unassign,
+    milestone,
+    tag,
+    add_tag,
+    remove_tag,
+    comment,
+    yes,
 ):
     """Update bug BUG_ID on PROJECT.
 
@@ -224,10 +237,12 @@ def update(
         status=status,
         importance=importance,
         assignee=assignee,
+        unassign=unassign,
         milestone=milestone,
         tags=list(tag) if tag else None,
         add_tags=list(add_tag) if add_tag else None,
         remove_tags=list(remove_tag) if remove_tag else None,
+        comment=comment,
     )
     click.echo(f"Updated bug #{bug.id}: {bug.web_link}")
 

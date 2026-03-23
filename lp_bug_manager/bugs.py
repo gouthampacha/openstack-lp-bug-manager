@@ -136,10 +136,12 @@ def update_bug(
     status=None,
     importance=None,
     assignee=None,
+    unassign=False,
     milestone=None,
     tags=None,
     add_tags=None,
     remove_tags=None,
+    comment=None,
 ):
     """Update an existing bug's status, importance, assignee, milestone, or tags."""
     lp = get_launchpad()
@@ -151,7 +153,9 @@ def update_bug(
         task.status = status
     if importance:
         task.importance = importance
-    if assignee:
+    if unassign:
+        task.assignee = None
+    elif assignee:
         task.assignee = lp.people[assignee]
     if milestone:
         project = get_project(project_name)
@@ -159,8 +163,11 @@ def update_bug(
         if ms is None:
             raise ValueError(f"Milestone '{milestone}' not found on {project_name}")
         task.milestone = ms
-    if status or importance or assignee or milestone:
+    if status or importance or assignee or unassign or milestone:
         task.lp_save()
+
+    if comment:
+        bug.newMessage(content=comment)
 
     tags_changed = False
     if tags is not None:
