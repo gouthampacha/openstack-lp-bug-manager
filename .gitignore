@@ -5,3 +5,5 @@ __pycache__/
 .eggs/
 build/
 dist/
+.claude/
+!.claude/commands/lp-bug.md

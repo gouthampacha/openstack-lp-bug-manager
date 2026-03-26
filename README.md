@@ -181,6 +181,18 @@ lp-bug update 2144047 --comment "Unassigning, no progress in 3 months."
 lp-bug link-gerrit 2144047 https://review.opendev.org/c/openstack/manila-ui/+/976962
 ```
 
+## Claude Code integration
+
+This repo includes a [Claude Code](https://claude.com/claude-code) slash
+command at `.claude/commands/lp-bug.md`. With Claude Code installed, use
+`/lp-bug` followed by any subcommand:
+
+```
+/lp-bug show 2144047 --comments
+/lp-bug scrub manila
+/lp-bug search manila --status New
+```
+
 ## Projects
 
 The default project set is `manila`, `manila-ui`, and `python-manilaclient`.
