@@ -290,3 +290,38 @@ def get_bug(bug_id):
             for t in bug.bug_tasks
         ],
     }
+
+
+def get_comments(bug_id):
+    """Fetch comments on a bug (skipping the original description at index 0)."""
+    lp = get_launchpad()
+    bug = lp.bugs[bug_id]
+    comments = []
+    for i, message in enumerate(bug.messages):
+        if i == 0:
+            continue
+        comments.append(
+            {
+                "index": i,
+                "author": message.owner.display_name,
+                "date": message.date_created,
+                "content": message.content,
+            }
+        )
+    return comments
+
+
+def get_attachments(bug_id):
+    """Fetch attachments on a bug."""
+    lp = get_launchpad()
+    bug = lp.bugs[bug_id]
+    attachments = []
+    for attachment in bug.attachments:
+        attachments.append(
+            {
+                "title": attachment.title,
+                "type": attachment.type,
+                "url": attachment.web_link,
+            }
+        )
+    return attachments

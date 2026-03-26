@@ -110,7 +110,9 @@ def file_bug(project, title, description, importance, status, tag, information_t
 # -- show --
 @main.command("show")
 @click.argument("bug_id", type=int)
-def show_bug(bug_id):
+@click.option("--comments", is_flag=True, help="Show comments")
+@click.option("--attachments", is_flag=True, help="Show attachments")
+def show_bug(bug_id, comments, attachments):
     """Show details of a bug by ID."""
     b = bugs.get_bug(bug_id)
     click.echo(f"Bug #{b['id']}: {b['title']}")
@@ -126,6 +128,27 @@ def show_bug(bug_id):
         )
     click.echo()
     click.echo(b["description"])
+
+    if comments:
+        comment_list = bugs.get_comments(bug_id)
+        if comment_list:
+            click.echo()
+            for c in comment_list:
+                date_str = c["date"].strftime("%Y-%m-%d")
+                click.echo(f"--- #{c['index']} by {c['author']} on {date_str} ---")
+                click.echo(c["content"])
+                click.echo()
+        else:
+            click.echo("\nNo comments.")
+
+    if attachments:
+        attachment_list = bugs.get_attachments(bug_id)
+        if attachment_list:
+            click.echo("\nAttachments:")
+            for i, a in enumerate(attachment_list, 1):
+                click.echo(f'  [{i}] "{a["title"]}" ({a["type"]}) — {a["url"]}')
+        else:
+            click.echo("\nNo attachments.")
 
 
 # -- search --

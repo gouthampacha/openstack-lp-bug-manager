@@ -140,6 +140,15 @@ lp-bug rotten manila --days 90
 # Show a single bug
 lp-bug show 2144047
 
+# Show bug with comments
+lp-bug show 2144047 --comments
+
+# Show bug with attachments
+lp-bug show 2144047 --attachments
+
+# Both
+lp-bug show 2144047 --comments --attachments
+
 # File a new bug
 lp-bug file manila-ui "Something is broken" -d "Steps to reproduce..." -i Medium
 
