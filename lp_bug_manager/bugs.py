@@ -28,15 +28,30 @@ VALID_IMPORTANCES = [
 ]
 
 
-def file_bug(project_name, title, description, importance=None, status=None, tags=None):
+VALID_INFORMATION_TYPES = [
+    "Public",
+    "Public Security",
+    "Private Security",
+    "Private",
+]
+
+
+def file_bug(
+    project_name,
+    title,
+    description,
+    importance=None,
+    status=None,
+    tags=None,
+    information_type=None,
+):
     """Create a new bug on a Launchpad project."""
     lp = get_launchpad()
     project = get_project(project_name)
-    bug = lp.bugs.createBug(
-        target=project,
-        title=title,
-        description=description,
-    )
+    create_kwargs = dict(target=project, title=title, description=description)
+    if information_type:
+        create_kwargs["information_type"] = information_type
+    bug = lp.bugs.createBug(**create_kwargs)
     task = bug.bug_tasks[0]
     if importance:
         task.importance = importance

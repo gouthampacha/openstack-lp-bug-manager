@@ -87,10 +87,22 @@ def main():
 )
 @click.option("--status", "-s", type=click.Choice(bugs.VALID_STATUSES, case_sensitive=False))
 @click.option("--tag", "-t", multiple=True, help="Tags (repeatable)")
-def file_bug(project, title, description, importance, status, tag):
+@click.option(
+    "--information-type",
+    type=click.Choice(bugs.VALID_INFORMATION_TYPES, case_sensitive=False),
+    default=None,
+    help="Bug visibility (default: Public)",
+)
+def file_bug(project, title, description, importance, status, tag, information_type):
     """File a new bug on PROJECT with TITLE."""
     bug = bugs.file_bug(
-        project, title, description, importance=importance, status=status, tags=list(tag) or None
+        project,
+        title,
+        description,
+        importance=importance,
+        status=status,
+        tags=list(tag) or None,
+        information_type=information_type,
     )
     click.echo(f"Created bug #{bug.id}: {bug.web_link}")
 

@@ -143,6 +143,9 @@ lp-bug show 2144047
 # File a new bug
 lp-bug file manila-ui "Something is broken" -d "Steps to reproduce..." -i Medium
 
+# File a private security bug
+lp-bug file manila "TLS validation bypass" -d "Details..." --information-type "Private Security"
+
 # Update a bug (project is optional when the bug has a single task)
 lp-bug update 2144047 --status Triaged --importance Medium
 
