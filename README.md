@@ -152,6 +152,12 @@ lp-bug show 2144047 --comments --attachments
 # File a new bug
 lp-bug file manila-ui "Something is broken" -d "Steps to reproduce..." -i Medium
 
+# File a bug with an attachment
+lp-bug file manila "Crash on resize" -d "See attached log" --attach /tmp/error.log
+
+# File a bug with a patch
+lp-bug file manila "Fix for crash" -d "Proposed fix" --attach fix.patch --patch
+
 # File a private security bug
 lp-bug file manila "TLS validation bypass" -d "Details..." --information-type "Private Security"
 
@@ -176,6 +182,12 @@ lp-bug update 2144047 --unassign --status Triaged
 
 # Add a comment
 lp-bug update 2144047 --comment "Unassigning, no progress in 3 months."
+
+# Attach a file to an existing bug
+lp-bug update 2144047 --attach analysis.txt
+
+# Attach a patch
+lp-bug update 2144047 --attach fix.patch --patch
 
 # Link a Gerrit review to a bug
 lp-bug link-gerrit 2144047 https://review.opendev.org/c/openstack/manila-ui/+/976962

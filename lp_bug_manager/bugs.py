@@ -311,6 +311,28 @@ def get_comments(bug_id):
     return comments
 
 
+def add_attachment(bug_id, file_path, description=None, patch=False):
+    """Add an attachment to a bug."""
+    from pathlib import Path
+
+    lp = get_launchpad()
+    bug = lp.bugs[bug_id]
+    path = Path(file_path)
+    data = open(path, "rb")  # noqa: SIM115
+    kwargs = {
+        "data": data,
+        "filename": path.name,
+        "content_type": "application/octet-stream",
+    }
+    if description:
+        kwargs["comment"] = description
+    if patch:
+        kwargs["is_patch"] = True
+    bug.addAttachment(**kwargs)
+    data.close()
+    return bug
+
+
 def get_attachments(bug_id):
     """Fetch attachments on a bug."""
     lp = get_launchpad()

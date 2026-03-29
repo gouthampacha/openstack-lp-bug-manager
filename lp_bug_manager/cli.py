@@ -93,7 +93,13 @@ def main():
     default=None,
     help="Bug visibility (default: Public)",
 )
-def file_bug(project, title, description, importance, status, tag, information_type):
+@click.option(
+    "--attach", multiple=True, type=click.Path(exists=True), help="Attach a file (repeatable)"
+)
+@click.option("--patch", is_flag=True, help="Mark attachments as patches")
+def file_bug(
+    project, title, description, importance, status, tag, information_type, attach, patch
+):
     """File a new bug on PROJECT with TITLE."""
     bug = bugs.file_bug(
         project,
@@ -104,6 +110,9 @@ def file_bug(project, title, description, importance, status, tag, information_t
         tags=list(tag) or None,
         information_type=information_type,
     )
+    for filepath in attach:
+        bugs.add_attachment(bug.id, filepath, patch=patch)
+        click.echo(f"Attached: {filepath}")
     click.echo(f"Created bug #{bug.id}: {bug.web_link}")
 
 
@@ -218,6 +227,10 @@ def search(project, status, importance, tag, text, since, before, max_results):
 @click.option("--add-tag", multiple=True, help="Add a tag (repeatable)")
 @click.option("--remove-tag", multiple=True, help="Remove a tag (repeatable)")
 @click.option("--comment", "-c", default=None, help="Add a comment to the bug")
+@click.option(
+    "--attach", multiple=True, type=click.Path(exists=True), help="Attach a file (repeatable)"
+)
+@click.option("--patch", is_flag=True, help="Mark attachments as patches")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
 def update(
     bug_id,
@@ -231,6 +244,8 @@ def update(
     add_tag,
     remove_tag,
     comment,
+    attach,
+    patch,
     yes,
 ):
     """Update bug BUG_ID on PROJECT.
@@ -279,6 +294,9 @@ def update(
         remove_tags=list(remove_tag) if remove_tag else None,
         comment=comment,
     )
+    for filepath in attach:
+        bugs.add_attachment(bug_id, filepath, patch=patch)
+        click.echo(f"Attached: {filepath}")
     click.echo(f"Updated bug #{bug.id}: {bug.web_link}")
 
     if reactivated:
