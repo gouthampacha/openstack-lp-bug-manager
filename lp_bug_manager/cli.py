@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import click
 from prettytable import PrettyTable
 
-from lp_bug_manager import analytics, bugs
+from lp_bug_manager import analytics, audit, bugs, vmt
 from lp_bug_manager.releases import get_cycle, get_milestones_for_project, list_cycles
 
 DEFAULT_PROJECTS = ["manila", "manila-ui", "python-manilaclient"]
@@ -121,7 +121,16 @@ def file_bug(
 @click.argument("bug_id", type=int)
 @click.option("--comments", is_flag=True, help="Show comments")
 @click.option("--attachments", is_flag=True, help="Show attachments")
-def show_bug(bug_id, comments, attachments):
+@click.option("--subscriptions", is_flag=True, help="Show subscriptions")
+@click.option("--fetch-patches", is_flag=True, help="Download patch attachments")
+@click.option(
+    "--output-dir",
+    "-o",
+    default=".",
+    type=click.Path(exists=True),
+    help="Output directory for --fetch-patches",
+)
+def show_bug(bug_id, comments, attachments, subscriptions, fetch_patches, output_dir):
     """Show details of a bug by ID."""
     b = bugs.get_bug(bug_id)
     click.echo(f"Bug #{b['id']}: {b['title']}")
@@ -158,6 +167,25 @@ def show_bug(bug_id, comments, attachments):
                 click.echo(f'  [{i}] "{a["title"]}" ({a["type"]}) — {a["url"]}')
         else:
             click.echo("\nNo attachments.")
+
+    if subscriptions:
+        sub_list = bugs.get_subscriptions(bug_id)
+        if sub_list:
+            click.echo("\nSubscriptions:")
+            for s in sub_list:
+                kind = "team" if s["is_team"] else "user"
+                click.echo(f"  {s['display_name']} ({s['name']}) [{kind}]")
+        else:
+            click.echo("\nNo subscriptions.")
+
+    if fetch_patches:
+        saved = bugs.fetch_patches(bug_id, output_dir=output_dir)
+        if saved:
+            for path in saved:
+                click.echo(f"Saved: {path}")
+            click.echo(f"Downloaded {len(saved)} patch(es)")
+        else:
+            click.echo("No patch attachments found.")
 
 
 # -- search --
@@ -228,9 +256,18 @@ def search(project, status, importance, tag, text, since, before, max_results):
 @click.option("--remove-tag", multiple=True, help="Remove a tag (repeatable)")
 @click.option("--comment", "-c", default=None, help="Add a comment to the bug")
 @click.option(
+    "--comment-file",
+    type=click.File("r"),
+    default=None,
+    help="Read comment from file (use - for stdin)",
+)
+@click.option(
     "--attach", multiple=True, type=click.Path(exists=True), help="Attach a file (repeatable)"
 )
 @click.option("--patch", is_flag=True, help="Mark attachments as patches")
+@click.option("--subscribe", multiple=True, help="Subscribe a team or person (repeatable)")
+@click.option("--link-cve", default=None, help="Link a CVE identifier")
+@click.option("--link-gerrit", default=None, help="Link a Gerrit review URL")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
 def update(
     bug_id,
@@ -244,8 +281,12 @@ def update(
     add_tag,
     remove_tag,
     comment,
+    comment_file,
     attach,
     patch,
+    subscribe,
+    link_cve,
+    link_gerrit,
     yes,
 ):
     """Update bug BUG_ID on PROJECT.
@@ -253,6 +294,11 @@ def update(
     PROJECT is optional when the bug has only one task. If the bug spans
     multiple projects, specify which one to update.
     """
+    if comment and comment_file:
+        raise click.UsageError("Cannot use both --comment and --comment-file")
+    if comment_file:
+        comment = comment_file.read()
+
     from lp_bug_manager.client import get_project as get_lp_project
 
     # Resolve the project name early if we need it for milestone checks
@@ -281,39 +327,153 @@ def update(
             ms.lp_save()
             reactivated = True
 
-    bug = bugs.update_bug(
-        bug_id,
-        project,
-        status=status,
-        importance=importance,
-        assignee=assignee,
-        unassign=unassign,
-        milestone=milestone,
-        tags=list(tag) if tag else None,
-        add_tags=list(add_tag) if add_tag else None,
-        remove_tags=list(remove_tag) if remove_tag else None,
-        comment=comment,
+    has_updates = any(
+        [
+            status,
+            importance,
+            assignee,
+            unassign,
+            milestone,
+            tag,
+            add_tag,
+            remove_tag,
+            comment,
+            attach,
+        ]
     )
-    for filepath in attach:
-        bugs.add_attachment(bug_id, filepath, patch=patch)
-        click.echo(f"Attached: {filepath}")
-    click.echo(f"Updated bug #{bug.id}: {bug.web_link}")
+    if has_updates:
+        bug = bugs.update_bug(
+            bug_id,
+            project,
+            status=status,
+            importance=importance,
+            assignee=assignee,
+            unassign=unassign,
+            milestone=milestone,
+            tags=list(tag) if tag else None,
+            add_tags=list(add_tag) if add_tag else None,
+            remove_tags=list(remove_tag) if remove_tag else None,
+            comment=comment,
+        )
+        for filepath in attach:
+            bugs.add_attachment(bug_id, filepath, patch=patch)
+            click.echo(f"Attached: {filepath}")
+        click.echo(f"Updated bug #{bug.id}: {bug.web_link}")
 
     if reactivated:
         ms.is_active = False
         ms.lp_save()
         click.echo(f"Milestone '{milestone}' deactivated again.")
 
+    for team in subscribe:
+        bugs.subscribe_bug(bug_id, team)
+        click.echo(f"Subscribed '{team}' to bug #{bug_id}")
 
-# -- link-gerrit --
-@main.command("link-gerrit")
+    if link_cve:
+        try:
+            bugs.link_cve(bug_id, link_cve)
+            click.echo(f"Linked {link_cve} to bug #{bug_id}")
+        except ValueError as e:
+            raise click.ClickException(str(e))
+
+    if link_gerrit:
+        bugs.add_gerrit_link(bug_id, link_gerrit, comment=comment)
+        click.echo(f"Linked Gerrit review to bug #{bug_id}")
+
+
+# -- add-task --
+@main.command("add-task")
 @click.argument("bug_id", type=int)
-@click.argument("gerrit_url")
-@click.option("--comment", "-c", default=None, help="Comment text")
-def link_gerrit(bug_id, gerrit_url, comment):
-    """Add a Gerrit review link to bug BUG_ID."""
-    bug = bugs.add_gerrit_link(bug_id, gerrit_url, comment=comment)
-    click.echo(f"Linked Gerrit review to bug #{bug.id}")
+@click.argument("project")
+@click.option("--status", "-s", type=click.Choice(bugs.VALID_STATUSES, case_sensitive=False))
+@click.option(
+    "--importance", "-i", type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False)
+)
+@click.option("--assignee", "-a", default=None, help="Launchpad username")
+def add_task_cmd(bug_id, project, status, importance, assignee):
+    """Add a new bugtask for PROJECT on bug BUG_ID."""
+    bug = bugs.add_task(bug_id, project, status=status, importance=importance, assignee=assignee)
+    click.echo(f"Added '{project}' task to bug #{bug.id}: {bug.web_link}")
+
+
+# -- intake --
+@main.command("intake")
+@click.argument("bug_id", type=int)
+@click.option(
+    "--embargo-days", default=90, type=int, help="Embargo duration in days (default: 90)"
+)
+@click.option("--ossn", is_flag=True, help="Add OSSN task instead of OSSA")
+@click.option("--skip-subscribe", is_flag=True, help="Don't subscribe the coresec team")
+@click.option("--dry-run", is_flag=True, help="Show what would be done without making changes")
+def intake(bug_id, embargo_days, ossn, skip_subscribe, dry_run):
+    """VMT intake: set up embargo, advisory task, and coresec subscription on BUG_ID."""
+    result = vmt.intake_bug(
+        bug_id,
+        embargo_days=embargo_days,
+        use_ossn=ossn,
+        skip_subscribe=skip_subscribe,
+        dry_run=dry_run,
+    )
+    prefix = "[DRY RUN] " if dry_run else ""
+    click.echo(f"{prefix}Intake for bug #{result['bug_id']} ({result['advisory']}):")
+    for action in result["actions"]:
+        click.echo(f"  - {action}")
+
+
+# -- vmt-dashboard --
+@main.command("vmt-dashboard")
+@click.option("--assigned-only", is_flag=True, help="Only show bugs assigned to me")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def vmt_dashboard_cmd(assigned_only, as_json):
+    """Show open OSSA and OSSN bugs, split by assignment."""
+    import json
+
+    result = vmt.vmt_dashboard(assigned_only=assigned_only)
+
+    if as_json:
+        from lp_bug_manager.serializers import serialize_value
+
+        click.echo(json.dumps(serialize_value(result), indent=2))
+        return
+
+    click.echo(click.style(f"\nVMT Dashboard — {result['me']}", bold=True))
+
+    click.echo(click.style(f"\n-- Assigned to me ({len(result['assigned'])}) --", fg="cyan"))
+    if result["assigned"]:
+        click.echo(_vmt_table(result["assigned"]))
+    else:
+        click.echo("  None")
+
+    if not assigned_only and "other" in result:
+        click.echo(click.style(f"\n-- Other open bugs ({len(result['other'])}) --", fg="yellow"))
+        if result["other"]:
+            click.echo(_vmt_table(result["other"]))
+        else:
+            click.echo("  None")
+
+    click.echo()
+
+
+def _vmt_table(bug_list):
+    """Format VMT dashboard bugs as a PrettyTable."""
+    t = PrettyTable()
+    t.field_names = ["ID", "Advisory", "Title", "Status", "Importance", "Updated", "Action"]
+    t.align["Title"] = "l"
+    t.max_width["Title"] = 45
+
+    for b in bug_list:
+        t.add_row(
+            [
+                b["id"],
+                b.get("advisory", ""),
+                b["title"][:45],
+                b["status"],
+                b["importance"],
+                b["updated"].strftime("%Y-%m-%d"),
+                b.get("action", ""),
+            ]
+        )
+    return t
 
 
 # -- reported --
@@ -630,6 +790,62 @@ def releases():
     t.field_names = ["Version", "Codename", "Start", "End"]
     for version, info in list_cycles().items():
         t.add_row([version, info["name"], info["start"], info["end"]])
+    click.echo(t)
+
+
+# -- audit-trackers --
+@main.command("audit-trackers")
+@click.option("--active-only", is_flag=True, help="Only show projects in TC governance")
+@click.option("--html", "html_file", type=click.Path(), default=None, help="Generate HTML report")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def audit_trackers(active_only, html_file, as_json):
+    """Audit Launchpad project tracker configuration.
+
+    Checks driver and bug_supervisor settings for OpenStack projects.
+    Shows only misconfigured projects.
+    """
+    import json
+
+    results = audit.audit_all(active_only=active_only)
+
+    if as_json:
+        click.echo(json.dumps(results, indent=2))
+        return
+
+    if html_file:
+        audit.render_html(results, html_file)
+        click.echo(f"HTML report written to {html_file}")
+        return
+
+    if not results:
+        click.echo("All projects are correctly configured.")
+        return
+
+    click.echo(f"Found {len(results)} misconfigured project(s):\n")
+    t = PrettyTable()
+    t.field_names = [
+        "Project",
+        "Driver",
+        "Driver Owner",
+        "Bug Supervisor",
+        "Bug Sup Owner",
+        "Issues",
+    ]
+    t.align["Project"] = "l"
+    t.align["Issues"] = "l"
+    t.max_width["Issues"] = 50
+
+    for r in results:
+        t.add_row(
+            [
+                r["project"],
+                r["driver"] or "—",
+                r["driver_owner"] or "—",
+                r["bug_supervisor"] or "—",
+                r["bug_supervisor_owner"] or "—",
+                "; ".join(r["issues"]),
+            ]
+        )
     click.echo(t)
 
 

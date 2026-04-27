@@ -1,6 +1,6 @@
 """Tests for analytics module."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -156,7 +156,7 @@ class TestScrubReport:
 
     def test_stale_in_progress(self, mock_search):
         old = datetime(2025, 1, 1, tzinfo=timezone.utc)
-        recent = datetime(2026, 3, 10, tzinfo=timezone.utc)
+        recent = datetime.now(timezone.utc) - timedelta(days=5)
 
         def side_effect(project, status=None, **kwargs):
             if status == "In Progress":

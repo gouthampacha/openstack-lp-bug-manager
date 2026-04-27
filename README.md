@@ -149,6 +149,9 @@ lp-bug show 2144047 --attachments
 # Both
 lp-bug show 2144047 --comments --attachments
 
+# Show bug subscriptions (teams and individuals)
+lp-bug show 2144047 --subscriptions
+
 # File a new bug
 lp-bug file manila-ui "Something is broken" -d "Steps to reproduce..." -i Medium
 
@@ -183,6 +186,10 @@ lp-bug update 2144047 --unassign --status Triaged
 # Add a comment
 lp-bug update 2144047 --comment "Unassigning, no progress in 3 months."
 
+# Add a comment from a file (or stdin with -)
+lp-bug update 2144047 --comment-file advisory.txt
+echo "Closing" | lp-bug update 2144047 --comment-file -
+
 # Attach a file to an existing bug
 lp-bug update 2144047 --attach analysis.txt
 
@@ -190,7 +197,48 @@ lp-bug update 2144047 --attach analysis.txt
 lp-bug update 2144047 --attach fix.patch --patch
 
 # Link a Gerrit review to a bug
-lp-bug link-gerrit 2144047 https://review.opendev.org/c/openstack/manila-ui/+/976962
+lp-bug update 2144047 --link-gerrit https://review.opendev.org/c/openstack/manila-ui/+/976962
+
+# Subscribe a team or person to a bug
+lp-bug update 2150316 --subscribe oslo-coresec
+
+# Link a CVE to a bug
+lp-bug update 2138575 --link-cve CVE-2026-40212
+
+# Download patch attachments from a bug
+lp-bug show 2148398 --fetch-patches
+lp-bug show 2148398 --fetch-patches --output-dir /tmp/patches/
+```
+
+### VMT (Vulnerability Management Team)
+
+```
+# Full intake workflow: embargo reminder, OSSA task, coresec subscription, reception comment
+lp-bug intake 2150316
+
+# Custom embargo duration
+lp-bug intake 2150316 --embargo-days 60
+
+# OSSN instead of OSSA
+lp-bug intake 2150332 --ossn
+
+# Preview without making changes
+lp-bug intake 2150316 --dry-run
+
+# Add a bugtask for a project
+lp-bug add-task 2150316 ossa --status Incomplete
+lp-bug add-task 2146554 ossn --status "In Progress" --assignee gouthamr
+
+# VMT dashboard: open OSSA/OSSN bugs split by assignment
+lp-bug vmt-dashboard
+lp-bug vmt-dashboard --assigned-only
+lp-bug vmt-dashboard --json
+
+# Audit Launchpad project tracker configuration
+lp-bug audit-trackers
+lp-bug audit-trackers --active-only
+lp-bug audit-trackers --json
+lp-bug audit-trackers --html report.html
 ```
 
 ## Claude Code integration

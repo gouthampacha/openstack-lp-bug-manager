@@ -93,6 +93,61 @@ class TestShow:
         assert "ui, locks" in result.output
 
 
+class TestShowFetchPatches:
+    @patch("lp_bug_manager.cli.bugs.fetch_patches")
+    @patch("lp_bug_manager.cli.bugs.get_bug")
+    def test_downloads_patches(self, mock_get, mock_fetch, runner):
+        mock_get.return_value = {
+            "id": 2148398,
+            "title": "Crash on resize",
+            "description": "desc",
+            "tags": [],
+            "web_link": "https://bugs.launchpad.net/manila/+bug/2148398",
+            "created": datetime(2026, 3, 1, tzinfo=timezone.utc),
+            "updated": datetime(2026, 3, 12, tzinfo=timezone.utc),
+            "tasks": [
+                {
+                    "target": "manila",
+                    "status": "New",
+                    "importance": "Medium",
+                    "assignee": "Unassigned",
+                }
+            ],
+        }
+        mock_fetch.return_value = ["/tmp/fix.patch"]
+
+        result = runner.invoke(main, ["show", "2148398", "--fetch-patches"])
+        assert result.exit_code == 0
+        assert "fix.patch" in result.output
+        assert "Downloaded 1 patch(es)" in result.output
+
+    @patch("lp_bug_manager.cli.bugs.fetch_patches")
+    @patch("lp_bug_manager.cli.bugs.get_bug")
+    def test_no_patches(self, mock_get, mock_fetch, runner):
+        mock_get.return_value = {
+            "id": 100,
+            "title": "Test bug",
+            "description": "desc",
+            "tags": [],
+            "web_link": "https://bugs.launchpad.net/manila/+bug/100",
+            "created": datetime(2026, 3, 1, tzinfo=timezone.utc),
+            "updated": datetime(2026, 3, 12, tzinfo=timezone.utc),
+            "tasks": [
+                {
+                    "target": "manila",
+                    "status": "New",
+                    "importance": "Medium",
+                    "assignee": "Unassigned",
+                }
+            ],
+        }
+        mock_fetch.return_value = []
+
+        result = runner.invoke(main, ["show", "100", "--fetch-patches"])
+        assert result.exit_code == 0
+        assert "No patch attachments found" in result.output
+
+
 class TestUpdate:
     @patch("lp_bug_manager.cli.bugs.update_bug")
     @patch("lp_bug_manager.client.get_project")
@@ -158,6 +213,59 @@ class TestUpdate:
         assert "Temporarily activate" not in result.output
         assert "deactivated again" in result.output
         mock_update.assert_called_once()
+
+    @patch("lp_bug_manager.cli.bugs.subscribe_bug")
+    def test_subscribe_option(self, mock_subscribe, runner):
+        result = runner.invoke(main, ["update", "2150316", "--subscribe", "oslo-coresec"])
+        assert result.exit_code == 0
+        assert "Subscribed 'oslo-coresec' to bug #2150316" in result.output
+        mock_subscribe.assert_called_once_with(2150316, "oslo-coresec")
+
+    @patch("lp_bug_manager.cli.bugs.link_cve")
+    def test_link_cve_option(self, mock_link, runner):
+        mock_link.return_value = MagicMock()
+        result = runner.invoke(main, ["update", "2138575", "--link-cve", "CVE-2026-40212"])
+        assert result.exit_code == 0
+        assert "Linked CVE-2026-40212 to bug #2138575" in result.output
+        mock_link.assert_called_once_with(2138575, "CVE-2026-40212")
+
+    @patch("lp_bug_manager.cli.bugs.link_cve")
+    def test_link_cve_not_found(self, mock_link, runner):
+        mock_link.side_effect = ValueError("CVE-9999-99999 not found")
+        result = runner.invoke(main, ["update", "100", "--link-cve", "CVE-9999-99999"])
+        assert result.exit_code != 0
+        assert "not found" in result.output
+
+    @patch("lp_bug_manager.cli.bugs.add_gerrit_link")
+    def test_link_gerrit_option(self, mock_gerrit, runner):
+        mock_gerrit.return_value = MagicMock()
+        result = runner.invoke(
+            main,
+            [
+                "update",
+                "100",
+                "--link-gerrit",
+                "https://review.opendev.org/c/openstack/manila/+/976962",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Linked Gerrit review" in result.output
+        mock_gerrit.assert_called_once()
+
+    @patch("lp_bug_manager.cli.bugs.update_bug")
+    @patch("lp_bug_manager.cli.bugs.subscribe_bug")
+    def test_subscribe_with_status_update(self, mock_subscribe, mock_update, runner):
+        mock_bug = MagicMock()
+        mock_bug.id = 100
+        mock_bug.web_link = "https://bugs.launchpad.net/manila/+bug/100"
+        mock_update.return_value = mock_bug
+
+        result = runner.invoke(
+            main, ["update", "100", "manila", "-s", "Triaged", "--subscribe", "nova-coresec"]
+        )
+        assert result.exit_code == 0
+        mock_update.assert_called_once()
+        mock_subscribe.assert_called_once_with(100, "nova-coresec")
 
     @patch("lp_bug_manager.cli.bugs.update_bug")
     @patch("lp_bug_manager.client.get_project")
@@ -505,3 +613,213 @@ class TestSetFocus:
         result = runner.invoke(main, ["set-focus", "manila", "nonexistent"])
         assert result.exit_code != 0
         assert "not found" in result.output
+
+
+class TestIntake:
+    @patch("lp_bug_manager.cli.vmt.intake_bug")
+    def test_intake(self, mock_intake, runner):
+        mock_intake.return_value = {
+            "bug_id": 2150316,
+            "advisory": "ossa",
+            "actions": [
+                "Prepended embargo reminder (expires 2026-07-26)",
+                "Added 'ossa' task (Incomplete)",
+                "Subscribed 'nova-coresec'",
+                "Posted reception comment",
+            ],
+        }
+        result = runner.invoke(main, ["intake", "2150316"])
+        assert result.exit_code == 0
+        assert "Intake for bug #2150316 (ossa)" in result.output
+        assert "Subscribed 'nova-coresec'" in result.output
+        mock_intake.assert_called_once_with(
+            2150316, embargo_days=90, use_ossn=False, skip_subscribe=False, dry_run=False
+        )
+
+    @patch("lp_bug_manager.cli.vmt.intake_bug")
+    def test_intake_dry_run(self, mock_intake, runner):
+        mock_intake.return_value = {
+            "bug_id": 2150316,
+            "advisory": "ossa",
+            "actions": ["Would prepend embargo reminder (expires 2026-07-26)"],
+        }
+        result = runner.invoke(main, ["intake", "2150316", "--dry-run"])
+        assert result.exit_code == 0
+        assert "[DRY RUN]" in result.output
+        mock_intake.assert_called_once_with(
+            2150316, embargo_days=90, use_ossn=False, skip_subscribe=False, dry_run=True
+        )
+
+    @patch("lp_bug_manager.cli.vmt.intake_bug")
+    def test_intake_ossn(self, mock_intake, runner):
+        mock_intake.return_value = {
+            "bug_id": 100,
+            "advisory": "ossn",
+            "actions": [],
+        }
+        result = runner.invoke(main, ["intake", "100", "--ossn"])
+        assert result.exit_code == 0
+        assert "(ossn)" in result.output
+        mock_intake.assert_called_once_with(
+            100, embargo_days=90, use_ossn=True, skip_subscribe=False, dry_run=False
+        )
+
+
+class TestVmtDashboard:
+    @patch("lp_bug_manager.cli.vmt.vmt_dashboard")
+    def test_table_output(self, mock_dashboard, runner):
+        mock_dashboard.return_value = {
+            "me": "Goutham",
+            "assigned": [
+                make_search_result(1, "My bug", assignee="Goutham")
+                | {"action": "Needs response", "advisory": "ossa"},
+            ],
+            "other": [
+                make_search_result(2, "Other bug", assignee="Alice")
+                | {"action": "Pending", "advisory": "ossn"},
+            ],
+        }
+
+        result = runner.invoke(main, ["vmt-dashboard"])
+        assert result.exit_code == 0
+        assert "Goutham" in result.output
+        assert "Assigned to me (1)" in result.output
+        assert "Other open bugs (1)" in result.output
+        assert "My bug" in result.output
+        assert "Other bug" in result.output
+
+    @patch("lp_bug_manager.cli.vmt.vmt_dashboard")
+    def test_assigned_only(self, mock_dashboard, runner):
+        mock_dashboard.return_value = {
+            "me": "Goutham",
+            "assigned": [],
+        }
+
+        result = runner.invoke(main, ["vmt-dashboard", "--assigned-only"])
+        assert result.exit_code == 0
+        assert "Assigned to me" in result.output
+        assert "Other open bugs" not in result.output
+        mock_dashboard.assert_called_once_with(assigned_only=True)
+
+    @patch("lp_bug_manager.cli.vmt.vmt_dashboard")
+    def test_json_output(self, mock_dashboard, runner):
+        mock_dashboard.return_value = {
+            "me": "Goutham",
+            "assigned": [
+                make_search_result(1, "Bug") | {"action": "Pending", "advisory": "ossa"},
+            ],
+            "other": [],
+        }
+
+        result = runner.invoke(main, ["vmt-dashboard", "--json"])
+        assert result.exit_code == 0
+        import json
+
+        data = json.loads(result.output)
+        assert data["me"] == "Goutham"
+        assert len(data["assigned"]) == 1
+
+
+class TestAddTask:
+    @patch("lp_bug_manager.cli.bugs.add_task")
+    def test_adds_task(self, mock_add_task, runner):
+        mock_bug = MagicMock()
+        mock_bug.id = 2150316
+        mock_bug.web_link = "https://bugs.launchpad.net/ossa/+bug/2150316"
+        mock_add_task.return_value = mock_bug
+
+        result = runner.invoke(main, ["add-task", "2150316", "ossa"])
+        assert result.exit_code == 0
+        assert "Added 'ossa' task to bug #2150316" in result.output
+        mock_add_task.assert_called_once_with(
+            2150316, "ossa", status=None, importance=None, assignee=None
+        )
+
+    @patch("lp_bug_manager.cli.bugs.add_task")
+    def test_with_options(self, mock_add_task, runner):
+        mock_bug = MagicMock()
+        mock_bug.id = 2150316
+        mock_bug.web_link = "https://bugs.launchpad.net/ossa/+bug/2150316"
+        mock_add_task.return_value = mock_bug
+
+        result = runner.invoke(
+            main,
+            ["add-task", "2150316", "ossa", "-s", "Incomplete", "-i", "High", "-a", "gouthamr"],
+        )
+        assert result.exit_code == 0
+        mock_add_task.assert_called_once_with(
+            2150316, "ossa", status="Incomplete", importance="High", assignee="gouthamr"
+        )
+
+
+class TestShowSubscriptions:
+    @patch("lp_bug_manager.cli.bugs.get_subscriptions")
+    @patch("lp_bug_manager.cli.bugs.get_bug")
+    def test_shows_subscriptions(self, mock_get, mock_subs, runner):
+        mock_get.return_value = {
+            "id": 100,
+            "title": "Test bug",
+            "description": "desc",
+            "tags": [],
+            "web_link": "https://bugs.launchpad.net/manila/+bug/100",
+            "created": datetime(2026, 3, 1, tzinfo=timezone.utc),
+            "updated": datetime(2026, 3, 12, tzinfo=timezone.utc),
+            "tasks": [
+                {
+                    "target": "manila",
+                    "status": "New",
+                    "importance": "Medium",
+                    "assignee": "Unassigned",
+                }
+            ],
+        }
+        mock_subs.return_value = [
+            {"name": "nova-coresec", "display_name": "Nova Core Security", "is_team": True},
+            {"name": "gouthamr", "display_name": "Goutham Pacha Ravi", "is_team": False},
+        ]
+
+        result = runner.invoke(main, ["show", "100", "--subscriptions"])
+        assert result.exit_code == 0
+        assert "Nova Core Security" in result.output
+        assert "[team]" in result.output
+        assert "Goutham Pacha Ravi" in result.output
+        assert "[user]" in result.output
+
+
+class TestCommentFile:
+    @patch("lp_bug_manager.cli.bugs.update_bug")
+    def test_reads_from_file(self, mock_update, runner, tmp_path):
+        comment_file = tmp_path / "comment.txt"
+        comment_file.write_text("Multi-line\ncomment here")
+
+        mock_bug = MagicMock()
+        mock_bug.id = 100
+        mock_bug.web_link = "https://bugs.launchpad.net/manila/+bug/100"
+        mock_update.return_value = mock_bug
+
+        result = runner.invoke(
+            main, ["update", "100", "manila", "--comment-file", str(comment_file)]
+        )
+        assert result.exit_code == 0
+        call_kwargs = mock_update.call_args[1]
+        assert call_kwargs["comment"] == "Multi-line\ncomment here"
+
+    @patch("lp_bug_manager.cli.bugs.update_bug")
+    def test_comment_and_file_errors(self, mock_update, runner, tmp_path):
+        comment_file = tmp_path / "comment.txt"
+        comment_file.write_text("from file")
+
+        result = runner.invoke(
+            main,
+            [
+                "update",
+                "100",
+                "manila",
+                "--comment",
+                "inline",
+                "--comment-file",
+                str(comment_file),
+            ],
+        )
+        assert result.exit_code != 0
+        assert "Cannot use both" in result.output

@@ -347,3 +347,79 @@ def get_attachments(bug_id):
             }
         )
     return attachments
+
+
+def subscribe_bug(bug_id, subscriber):
+    """Subscribe a team or person to a bug."""
+    lp = get_launchpad()
+    bug = lp.bugs[bug_id]
+    person = lp.people[subscriber]
+    bug.subscribe(person=person)
+    return bug
+
+
+def add_task(bug_id, project_name, status=None, importance=None, assignee=None):
+    """Add a new bugtask for a project on an existing bug."""
+    lp = get_launchpad()
+    bug = lp.bugs[bug_id]
+    project = get_project(project_name)
+    new_task = bug.addTask(target=project)
+    if status:
+        new_task.status = status
+    if importance:
+        new_task.importance = importance
+    if assignee:
+        new_task.assignee = lp.people[assignee]
+    if status or importance or assignee:
+        new_task.lp_save()
+    return bug
+
+
+def link_cve(bug_id, cve_id):
+    """Link a CVE identifier to a bug on Launchpad."""
+    lp = get_launchpad()
+    bug = lp.bugs[bug_id]
+    cve_number = cve_id.upper()
+    if not cve_number.startswith("CVE-"):
+        cve_number = f"CVE-{cve_number}"
+    try:
+        bug.linkCVE(cve=cve_number)
+    except Exception as e:
+        raise ValueError(
+            f"{cve_number} not found in Launchpad's CVE database. "
+            "It may not have been indexed yet."
+        ) from e
+    return bug
+
+
+def fetch_patches(bug_id, output_dir="."):
+    """Download all patch attachments from a bug. Returns list of saved file paths."""
+    from pathlib import Path
+
+    lp = get_launchpad()
+    bug = lp.bugs[bug_id]
+    saved = []
+    for attachment in bug.attachments:
+        if attachment.type == "Patch":
+            data = attachment.data.open().read()
+            path = Path(output_dir) / attachment.title
+            path.write_bytes(data)
+            saved.append(str(path))
+    return saved
+
+
+def get_subscriptions(bug_id):
+    """Fetch subscriptions on a bug."""
+    lp = get_launchpad()
+    bug = lp.bugs[bug_id]
+    subs = []
+    for sub in bug.subscriptions:
+        person = sub.person
+        subs.append(
+            {
+                "name": person.name,
+                "display_name": person.display_name,
+                "is_team": person.is_team,
+            }
+        )
+    return subs

@@ -6,11 +6,16 @@ from unittest.mock import MagicMock, patch
 from lp_bug_manager.bugs import (
     _to_utc_datetime,
     add_gerrit_link,
+    add_task,
     deactivate_milestone,
+    fetch_patches,
     file_bug,
     get_bug,
+    get_subscriptions,
+    link_cve,
     retarget_bugs,
     search_bugs,
+    subscribe_bug,
     update_bug,
 )
 from tests.conftest import make_bug
@@ -437,3 +442,176 @@ class TestDeactivateMilestone:
 
         with pytest.raises(ValueError, match="not found"):
             deactivate_milestone("manila", "nonexistent")
+
+
+class TestSubscribeBug:
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_subscribes_team(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, _ = make_bug(700, "Security bug")
+        lp.bugs.__getitem__.return_value = bug
+        team = MagicMock()
+        lp.people.__getitem__.return_value = team
+
+        result = subscribe_bug(700, "nova-coresec")
+
+        bug.subscribe.assert_called_once_with(person=team)
+        lp.people.__getitem__.assert_called_with("nova-coresec")
+        assert result.id == 700
+
+
+class TestAddTask:
+    @patch("lp_bug_manager.bugs.get_project")
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_adds_task(self, mock_lp, mock_project):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, _ = make_bug(800, "Multi-project bug")
+        lp.bugs.__getitem__.return_value = bug
+        new_task = MagicMock()
+        bug.addTask.return_value = new_task
+
+        result = add_task(800, "ossa")
+
+        bug.addTask.assert_called_once()
+        new_task.lp_save.assert_not_called()
+        assert result.id == 800
+
+    @patch("lp_bug_manager.bugs.get_project")
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_sets_status_and_importance(self, mock_lp, mock_project):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, _ = make_bug(801, "Bug")
+        lp.bugs.__getitem__.return_value = bug
+        new_task = MagicMock()
+        bug.addTask.return_value = new_task
+
+        add_task(801, "ossa", status="Incomplete", importance="High")
+
+        assert new_task.status == "Incomplete"
+        assert new_task.importance == "High"
+        new_task.lp_save.assert_called_once()
+
+    @patch("lp_bug_manager.bugs.get_project")
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_sets_assignee(self, mock_lp, mock_project):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, _ = make_bug(802, "Bug")
+        lp.bugs.__getitem__.return_value = bug
+        new_task = MagicMock()
+        bug.addTask.return_value = new_task
+        person = MagicMock()
+        lp.people.__getitem__.return_value = person
+
+        add_task(802, "ossn", assignee="gouthamr")
+
+        assert new_task.assignee == person
+        lp.people.__getitem__.assert_called_with("gouthamr")
+        new_task.lp_save.assert_called_once()
+
+
+class TestLinkCve:
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_links_cve(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, _ = make_bug(900, "CVE bug")
+        lp.bugs.__getitem__.return_value = bug
+
+        result = link_cve(900, "CVE-2026-40212")
+
+        bug.linkCVE.assert_called_once_with(cve="CVE-2026-40212")
+        assert result.id == 900
+
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_normalizes_cve_id(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, _ = make_bug(901, "Bug")
+        lp.bugs.__getitem__.return_value = bug
+
+        link_cve(901, "2026-40212")
+
+        bug.linkCVE.assert_called_once_with(cve="CVE-2026-40212")
+
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_not_found_raises(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, _ = make_bug(902, "Bug")
+        lp.bugs.__getitem__.return_value = bug
+        bug.linkCVE.side_effect = Exception("not found")
+
+        import pytest
+
+        with pytest.raises(ValueError, match="not found in Launchpad"):
+            link_cve(902, "CVE-9999-99999")
+
+
+class TestFetchPatches:
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_downloads_patches(self, mock_lp, tmp_path):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, _ = make_bug(1000, "Bug with patches")
+        lp.bugs.__getitem__.return_value = bug
+
+        patch_attachment = MagicMock()
+        patch_attachment.type = "Patch"
+        patch_attachment.title = "fix.patch"
+        patch_attachment.data.open.return_value.read.return_value = b"diff --git a/foo"
+
+        non_patch = MagicMock()
+        non_patch.type = "Unspecified"
+
+        bug.attachments = [patch_attachment, non_patch]
+
+        saved = fetch_patches(1000, output_dir=str(tmp_path))
+
+        assert len(saved) == 1
+        assert "fix.patch" in saved[0]
+        assert (tmp_path / "fix.patch").read_bytes() == b"diff --git a/foo"
+
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_no_patches(self, mock_lp, tmp_path):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, _ = make_bug(1001, "Bug without patches")
+        lp.bugs.__getitem__.return_value = bug
+        bug.attachments = []
+
+        saved = fetch_patches(1001, output_dir=str(tmp_path))
+
+        assert saved == []
+
+
+class TestGetSubscriptions:
+    @patch("lp_bug_manager.bugs.get_launchpad")
+    def test_returns_subscriptions(self, mock_lp):
+        lp = MagicMock()
+        mock_lp.return_value = lp
+        bug, _ = make_bug(1100, "Bug with subs")
+        lp.bugs.__getitem__.return_value = bug
+
+        sub1 = MagicMock()
+        sub1.person.name = "nova-coresec"
+        sub1.person.display_name = "Nova Core Security"
+        sub1.person.is_team = True
+
+        sub2 = MagicMock()
+        sub2.person.name = "gouthamr"
+        sub2.person.display_name = "Goutham Pacha Ravi"
+        sub2.person.is_team = False
+
+        bug.subscriptions = [sub1, sub2]
+
+        result = get_subscriptions(1100)
+
+        assert len(result) == 2
+        assert result[0]["name"] == "nova-coresec"
+        assert result[0]["is_team"] is True
+        assert result[1]["name"] == "gouthamr"
+        assert result[1]["is_team"] is False
