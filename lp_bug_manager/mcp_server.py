@@ -84,7 +84,8 @@ def create_server(read_only=False, no_cache=False):
                 if key in _cache and _cache[key][1] > now:
                     return _cache[key][0]
                 result = func(*args, **kwargs)
-                _cache[key] = (result, now + ttl_seconds)
+                if not result.startswith('{"error":'):
+                    _cache[key] = (result, now + ttl_seconds)
                 return result
 
             wrapper.cache = _cache
