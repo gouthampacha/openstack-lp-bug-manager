@@ -20,16 +20,19 @@ def create_server(read_only=False):
     from mcp.types import ToolAnnotations
 
     from lp_bug_manager import analytics, audit, bugs, vmt
+    from lp_bug_manager.bugs import VALID_IMPORTANCES, VALID_STATUSES
     from lp_bug_manager.releases import list_cycles as _list_cycles
     from lp_bug_manager.serializers import serialize_value
 
-    READ = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
+    READ = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
     WRITE = ToolAnnotations(readOnlyHint=False, openWorldHint=True)
+    WRITE_IDEMPOTENT = ToolAnnotations(readOnlyHint=False, idempotentHint=True, openWorldHint=True)
     DESTRUCTIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True)
 
     mcp = FastMCP(
         "Launchpad Bug Manager",
         instructions="MCP server for managing bugs on Launchpad.net",
+        version="0.1.0",
     )
 
     def _json(obj):
@@ -37,6 +40,26 @@ def create_server(read_only=False):
 
     def _bug_result(bug):
         return f"Bug #{bug.id}: {bug.web_link}"
+
+    def _validate_statuses(values):
+        if values:
+            bad = [v for v in values if v not in VALID_STATUSES]
+            if bad:
+                raise ValueError(
+                    f"Invalid status: {', '.join(bad)}. Valid values: {', '.join(VALID_STATUSES)}"
+                )
+
+    def _validate_importances(values):
+        if values:
+            bad = [v for v in values if v not in VALID_IMPORTANCES]
+            if bad:
+                raise ValueError(
+                    f"Invalid importance: {', '.join(bad)}. "
+                    f"Valid values: {', '.join(VALID_IMPORTANCES)}"
+                )
+
+    def _error(msg):
+        return json.dumps({"error": str(msg)})
 
     # --- Read tools ---
 
@@ -47,7 +70,10 @@ def create_server(read_only=False):
         Returns bug title, description, tags, web link, timestamps,
         and all bug tasks with their status/importance/assignee.
         """
-        return _json(bugs.get_bug(bug_id))
+        try:
+            return _json(bugs.get_bug(bug_id))
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def get_comments(bug_id: int) -> str:
@@ -56,7 +82,10 @@ def create_server(read_only=False):
         Returns a list of comments with index, author, date, and content.
         The original bug description (index 0) is excluded.
         """
-        return _json(bugs.get_comments(bug_id))
+        try:
+            return _json(bugs.get_comments(bug_id))
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def get_attachments(bug_id: int) -> str:
@@ -64,7 +93,10 @@ def create_server(read_only=False):
 
         Returns a list of attachments with title, type, and URL.
         """
-        return _json(bugs.get_attachments(bug_id))
+        try:
+            return _json(bugs.get_attachments(bug_id))
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def get_subscriptions(bug_id: int) -> str:
@@ -73,7 +105,10 @@ def create_server(read_only=False):
         Returns a list of subscribers with name, display name,
         and whether they are a team or individual.
         """
-        return _json(bugs.get_subscriptions(bug_id))
+        try:
+            return _json(bugs.get_subscriptions(bug_id))
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def search_bugs(
@@ -101,19 +136,24 @@ def create_server(read_only=False):
             created_before: Only bugs created before this date (YYYY-MM-DD).
             max_results: Maximum number of results (default 50).
         """
-        since = date.fromisoformat(created_since) if created_since else None
-        before = date.fromisoformat(created_before) if created_before else None
-        results = bugs.search_bugs(
-            project,
-            status=status,
-            importance=importance,
-            tags=tags,
-            search_text=search_text,
-            created_since=since,
-            created_before=before,
-            max_results=max_results,
-        )
-        return _json(results)
+        try:
+            _validate_statuses(status)
+            _validate_importances(importance)
+            since = date.fromisoformat(created_since) if created_since else None
+            before = date.fromisoformat(created_before) if created_before else None
+            results = bugs.search_bugs(
+                project,
+                status=status,
+                importance=importance,
+                tags=tags,
+                search_text=search_text,
+                created_since=since,
+                created_before=before,
+                max_results=max_results,
+            )
+            return _json(results)
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def scrub_report(
@@ -132,7 +172,10 @@ def create_server(read_only=False):
             stale_days: Threshold for flagging in-progress bugs as
                 stale (default 30).
         """
-        return _json(analytics.scrub_report(project, days=days, stale_days=stale_days))
+        try:
+            return _json(analytics.scrub_report(project, days=days, stale_days=stale_days))
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def cycle_summary(project: str, cycle: str) -> str:
@@ -145,7 +188,10 @@ def create_server(read_only=False):
             project: Launchpad project name.
             cycle: Release cycle name or version (e.g. "Gazpacho" or "2026.1").
         """
-        return _json(analytics.cycle_summary(project, cycle))
+        try:
+            return _json(analytics.cycle_summary(project, cycle))
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def bugs_reported(project: str, cycle: str) -> str:
@@ -155,7 +201,10 @@ def create_server(read_only=False):
             project: Launchpad project name.
             cycle: Release cycle name or version.
         """
-        return _json(analytics.bugs_reported_in_cycle(project, cycle))
+        try:
+            return _json(analytics.bugs_reported_in_cycle(project, cycle))
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def bugs_fixed(project: str, cycle: str) -> str:
@@ -165,7 +214,10 @@ def create_server(read_only=False):
             project: Launchpad project name.
             cycle: Release cycle name or version.
         """
-        return _json(analytics.bugs_fixed_in_cycle(project, cycle))
+        try:
+            return _json(analytics.bugs_fixed_in_cycle(project, cycle))
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def rotten_bugs(project: str, days: int = 180) -> str:
@@ -175,12 +227,18 @@ def create_server(read_only=False):
             project: Launchpad project name.
             days: Inactivity threshold in days (default 180).
         """
-        return _json(analytics.rotten_bugs(project, days=days))
+        try:
+            return _json(analytics.rotten_bugs(project, days=days))
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def list_cycles() -> str:
         """List all known OpenStack release cycles with their dates."""
-        return _json(_list_cycles())
+        try:
+            return _json(_list_cycles())
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def vmt_dashboard(assigned_only: bool = False) -> str:
@@ -193,7 +251,10 @@ def create_server(read_only=False):
         Args:
             assigned_only: Only return bugs assigned to the current user.
         """
-        return _json(vmt.vmt_dashboard(assigned_only=assigned_only))
+        try:
+            return _json(vmt.vmt_dashboard(assigned_only=assigned_only))
+        except Exception as e:
+            return _error(e)
 
     @mcp.tool(annotations=READ)
     def audit_project(project: str) -> str:
@@ -206,7 +267,10 @@ def create_server(read_only=False):
             project: Full project path (e.g. "openstack/nova") or
                 short name (e.g. "nova").
         """
-        return _json(audit.audit_project(project))
+        try:
+            return _json(audit.audit_project(project))
+        except Exception as e:
+            return _error(e)
 
     # --- Write tools (only when not read-only) ---
 
@@ -235,16 +299,23 @@ def create_server(read_only=False):
                 information_type: Visibility (Public, Public Security,
                     Private Security, Private).
             """
-            bug = bugs.file_bug(
-                project,
-                title,
-                description,
-                importance=importance,
-                status=status,
-                tags=tags,
-                information_type=information_type,
-            )
-            return _bug_result(bug)
+            try:
+                if status:
+                    _validate_statuses([status])
+                if importance:
+                    _validate_importances([importance])
+                bug = bugs.file_bug(
+                    project,
+                    title,
+                    description,
+                    importance=importance,
+                    status=status,
+                    tags=tags,
+                    information_type=information_type,
+                )
+                return _bug_result(bug)
+            except Exception as e:
+                return _error(e)
 
         @mcp.tool(annotations=WRITE)
         def update_bug(
@@ -276,22 +347,29 @@ def create_server(read_only=False):
                 remove_tags: Remove these tags.
                 comment: Add a comment to the bug.
             """
-            bug = bugs.update_bug(
-                bug_id,
-                project,
-                status=status,
-                importance=importance,
-                assignee=assignee,
-                unassign=unassign,
-                milestone=milestone,
-                tags=tags,
-                add_tags=add_tags,
-                remove_tags=remove_tags,
-                comment=comment,
-            )
-            return _bug_result(bug)
+            try:
+                if status:
+                    _validate_statuses([status])
+                if importance:
+                    _validate_importances([importance])
+                bug = bugs.update_bug(
+                    bug_id,
+                    project,
+                    status=status,
+                    importance=importance,
+                    assignee=assignee,
+                    unassign=unassign,
+                    milestone=milestone,
+                    tags=tags,
+                    add_tags=add_tags,
+                    remove_tags=remove_tags,
+                    comment=comment,
+                )
+                return _bug_result(bug)
+            except Exception as e:
+                return _error(e)
 
-        @mcp.tool(annotations=WRITE)
+        @mcp.tool(annotations=WRITE_IDEMPOTENT)
         def subscribe_bug(bug_id: int, subscriber: str) -> str:
             """Subscribe a team or person to a bug.
 
@@ -299,10 +377,13 @@ def create_server(read_only=False):
                 bug_id: Launchpad bug ID.
                 subscriber: Launchpad username or team name.
             """
-            bug = bugs.subscribe_bug(bug_id, subscriber)
-            return f"Subscribed '{subscriber}' to {_bug_result(bug)}"
+            try:
+                bug = bugs.subscribe_bug(bug_id, subscriber)
+                return f"Subscribed '{subscriber}' to {_bug_result(bug)}"
+            except Exception as e:
+                return _error(e)
 
-        @mcp.tool(annotations=WRITE)
+        @mcp.tool(annotations=WRITE_IDEMPOTENT)
         def link_cve(bug_id: int, cve_id: str) -> str:
             """Link a CVE identifier to a bug.
 
@@ -310,8 +391,11 @@ def create_server(read_only=False):
                 bug_id: Launchpad bug ID.
                 cve_id: CVE identifier (e.g. "CVE-2026-40212").
             """
-            bug = bugs.link_cve(bug_id, cve_id)
-            return f"Linked {cve_id} to {_bug_result(bug)}"
+            try:
+                bug = bugs.link_cve(bug_id, cve_id)
+                return f"Linked {cve_id} to {_bug_result(bug)}"
+            except Exception as e:
+                return _error(e)
 
         @mcp.tool(annotations=WRITE)
         def add_gerrit_link(
@@ -328,8 +412,11 @@ def create_server(read_only=False):
                 gerrit_url: Full Gerrit review URL.
                 comment: Optional comment text (URL is appended).
             """
-            bug = bugs.add_gerrit_link(bug_id, gerrit_url, comment=comment)
-            return f"Linked Gerrit review to {_bug_result(bug)}"
+            try:
+                bug = bugs.add_gerrit_link(bug_id, gerrit_url, comment=comment)
+                return f"Linked Gerrit review to {_bug_result(bug)}"
+            except Exception as e:
+                return _error(e)
 
         @mcp.tool(annotations=WRITE)
         def add_task(
@@ -348,10 +435,17 @@ def create_server(read_only=False):
                 importance: Initial importance.
                 assignee: Launchpad username to assign.
             """
-            bug = bugs.add_task(
-                bug_id, project, status=status, importance=importance, assignee=assignee
-            )
-            return f"Added '{project}' task to {_bug_result(bug)}"
+            try:
+                if status:
+                    _validate_statuses([status])
+                if importance:
+                    _validate_importances([importance])
+                bug = bugs.add_task(
+                    bug_id, project, status=status, importance=importance, assignee=assignee
+                )
+                return f"Added '{project}' task to {_bug_result(bug)}"
+            except Exception as e:
+                return _error(e)
 
         @mcp.tool(annotations=WRITE)
         def intake_bug(
@@ -374,13 +468,16 @@ def create_server(read_only=False):
                 use_ossn: Add an OSSN task instead of OSSA.
                 skip_subscribe: Don't subscribe the coresec team.
             """
-            result = vmt.intake_bug(
-                bug_id,
-                embargo_days=embargo_days,
-                use_ossn=use_ossn,
-                skip_subscribe=skip_subscribe,
-            )
-            return _json(result)
+            try:
+                result = vmt.intake_bug(
+                    bug_id,
+                    embargo_days=embargo_days,
+                    use_ossn=use_ossn,
+                    skip_subscribe=skip_subscribe,
+                )
+                return _json(result)
+            except Exception as e:
+                return _error(e)
 
         @mcp.tool(annotations=DESTRUCTIVE)
         def retarget_bugs(
@@ -399,8 +496,11 @@ def create_server(read_only=False):
                 from_milestone: Source milestone name.
                 to_milestone: Target milestone name.
             """
-            retargeted = bugs.retarget_bugs(project, from_milestone, to_milestone)
-            return _json(retargeted)
+            try:
+                retargeted = bugs.retarget_bugs(project, from_milestone, to_milestone)
+                return _json(retargeted)
+            except Exception as e:
+                return _error(e)
 
     return mcp
 

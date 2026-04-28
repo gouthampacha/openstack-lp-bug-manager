@@ -127,6 +127,65 @@ class TestReadTools:
         assert "2026.1" in data
 
 
+class TestErrorHandling:
+    @patch("lp_bug_manager.bugs.get_bug", side_effect=Exception("Bug not found"))
+    def test_get_bug_returns_error_json(self, mock_get):
+        server = create_server(read_only=True)
+        text = _call(server, "get_bug", {"bug_id": 999999})
+        data = json.loads(text)
+        assert "error" in data
+        assert "Bug not found" in data["error"]
+
+    def test_search_bugs_invalid_status(self):
+        server = create_server(read_only=True)
+        text = _call(
+            server,
+            "search_bugs",
+            {"project": "manila", "status": ["Bogus"]},
+        )
+        data = json.loads(text)
+        assert "error" in data
+        assert "Invalid status" in data["error"]
+        assert "Bogus" in data["error"]
+
+    def test_search_bugs_invalid_importance(self):
+        server = create_server(read_only=True)
+        text = _call(
+            server,
+            "search_bugs",
+            {"project": "manila", "importance": ["Extreme"]},
+        )
+        data = json.loads(text)
+        assert "error" in data
+        assert "Invalid importance" in data["error"]
+
+    @patch("lp_bug_manager.bugs.file_bug")
+    def test_file_bug_invalid_status(self, mock_file):
+        server = create_server(read_only=False)
+        text = _call(
+            server,
+            "file_bug",
+            {"project": "manila", "title": "t", "description": "d", "status": "Nope"},
+        )
+        data = json.loads(text)
+        assert "error" in data
+        assert "Invalid status" in data["error"]
+        mock_file.assert_not_called()
+
+    @patch("lp_bug_manager.bugs.update_bug")
+    def test_update_bug_invalid_importance(self, mock_update):
+        server = create_server(read_only=False)
+        text = _call(
+            server,
+            "update_bug",
+            {"bug_id": 100, "importance": "Extreme"},
+        )
+        data = json.loads(text)
+        assert "error" in data
+        assert "Invalid importance" in data["error"]
+        mock_update.assert_not_called()
+
+
 class TestWriteTools:
     @patch("lp_bug_manager.bugs.file_bug")
     def test_file_bug(self, mock_file):
