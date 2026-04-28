@@ -245,12 +245,19 @@ lp-bug audit-trackers --html report.html
 
 The package includes a vendor-agnostic
 [MCP](https://modelcontextprotocol.io/) server that exposes the
-Launchpad API to any MCP-compatible client.
+Launchpad API to any MCP-compatible client (Claude Code, Claude
+Desktop, Cursor, etc.).
 
 Install with MCP support:
 
 ```
 pip install openstack-lp-bug-manager[mcp]
+```
+
+Or install directly from GitHub:
+
+```
+pip install "openstack-lp-bug-manager[mcp] @ git+https://github.com/gouthampacha/openstack-lp-bug-manager.git"
 ```
 
 Run the server (stdio transport):
@@ -280,14 +287,56 @@ Launchpad API round-trips. Write tools always bypass the cache.
 All tools include MCP annotations (`readOnlyHint`,
 `destructiveHint`, `openWorldHint`) for client UX.
 
-## Claude Code integration
+## Using with AI coding tools
 
-This repo includes an [MCP](https://modelcontextprotocol.io/) server
-configuration (`.mcp.json`) and a `/lp-bug` slash command for
-[Claude Code](https://claude.com/claude-code). The slash command
-dispatches to the MCP server's tools instead of shelling out to the CLI.
+### Claude Code
 
-To use it in any project, add the MCP server to your `.mcp.json`:
+1. Install the package:
+
+   ```
+   pip install "openstack-lp-bug-manager[mcp] @ git+https://github.com/gouthampacha/openstack-lp-bug-manager.git"
+   ```
+
+2. Add the MCP server to your project's `.mcp.json` (or create one):
+
+   ```json
+   {
+     "mcpServers": {
+       "lp-bug": {
+         "command": "lp-bug-mcp",
+         "args": []
+       }
+     }
+   }
+   ```
+
+3. Copy the slash command for a natural `/lp-bug` interface:
+
+   ```
+   mkdir -p .claude/commands
+   curl -o .claude/commands/lp-bug.md https://raw.githubusercontent.com/gouthampacha/openstack-lp-bug-manager/main/.claude/commands/lp-bug.md
+   ```
+
+   Or install it globally so it's available in every project:
+
+   ```
+   mkdir -p ~/.claude/commands
+   curl -o ~/.claude/commands/lp-bug.md https://raw.githubusercontent.com/gouthampacha/openstack-lp-bug-manager/main/.claude/commands/lp-bug.md
+   ```
+
+4. Use it:
+
+   ```
+   /lp-bug scrub manila
+   /lp-bug show 2144047 --comments
+   /lp-bug search nova --status New --importance High
+   /lp-bug vmt-dashboard
+   ```
+
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`
+(macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
@@ -300,13 +349,12 @@ To use it in any project, add the MCP server to your `.mcp.json`:
 }
 ```
 
-Then use `/lp-bug` followed by any subcommand:
+### Other MCP clients
 
-```
-/lp-bug show 2144047 --comments
-/lp-bug scrub manila
-/lp-bug search manila --status New
-```
+Any client that supports the [MCP stdio
+transport](https://modelcontextprotocol.io/docs/concepts/transports)
+can use `lp-bug-mcp` as a command. Refer to your client's
+documentation for how to register an MCP server.
 
 ## Projects
 
