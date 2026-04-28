@@ -258,3 +258,72 @@ class TestWriteTools:
         mock_intake.assert_called_once_with(
             300, embargo_days=90, use_ossn=False, skip_subscribe=False
         )
+
+
+class TestCache:
+    @patch("lp_bug_manager.bugs.get_bug")
+    def test_cache_hit_skips_second_call(self, mock_get):
+        mock_get.return_value = {
+            "id": 42,
+            "title": "cached",
+            "description": "",
+            "tags": [],
+            "web_link": "https://bugs.launchpad.net/nova/+bug/42",
+            "created": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            "updated": datetime(2026, 1, 2, tzinfo=timezone.utc),
+            "tasks": [],
+        }
+        server = create_server(read_only=True)
+        first = _call(server, "get_bug", {"bug_id": 42})
+        second = _call(server, "get_bug", {"bug_id": 42})
+        assert first == second
+        mock_get.assert_called_once_with(42)
+
+    @patch("lp_bug_manager.bugs.get_bug")
+    def test_different_args_are_separate_entries(self, mock_get):
+        mock_get.side_effect = lambda bid: {
+            "id": bid,
+            "title": f"bug {bid}",
+            "description": "",
+            "tags": [],
+            "web_link": f"https://bugs.launchpad.net/nova/+bug/{bid}",
+            "created": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            "updated": datetime(2026, 1, 2, tzinfo=timezone.utc),
+            "tasks": [],
+        }
+        server = create_server(read_only=True)
+        first = _call(server, "get_bug", {"bug_id": 1})
+        second = _call(server, "get_bug", {"bug_id": 2})
+        assert json.loads(first)["id"] == 1
+        assert json.loads(second)["id"] == 2
+        assert mock_get.call_count == 2
+
+    @patch("lp_bug_manager.mcp_server.time")
+    @patch("lp_bug_manager.bugs.get_bug")
+    def test_cache_expires_after_ttl(self, mock_get, mock_time):
+        mock_get.return_value = {
+            "id": 7,
+            "title": "expiry",
+            "description": "",
+            "tags": [],
+            "web_link": "https://bugs.launchpad.net/nova/+bug/7",
+            "created": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            "updated": datetime(2026, 1, 2, tzinfo=timezone.utc),
+            "tasks": [],
+        }
+        mock_time.side_effect = [0, 301]
+        server = create_server(read_only=True)
+        _call(server, "get_bug", {"bug_id": 7})
+        _call(server, "get_bug", {"bug_id": 7})
+        assert mock_get.call_count == 2
+
+    @patch("lp_bug_manager.bugs.update_bug")
+    def test_write_tools_not_cached(self, mock_update):
+        bug = MagicMock()
+        bug.id = 10
+        bug.web_link = "https://bugs.launchpad.net/nova/+bug/10"
+        mock_update.return_value = bug
+        server = create_server(read_only=False)
+        _call(server, "update_bug", {"bug_id": 10, "status": "Triaged"})
+        _call(server, "update_bug", {"bug_id": 10, "status": "Triaged"})
+        assert mock_update.call_count == 2

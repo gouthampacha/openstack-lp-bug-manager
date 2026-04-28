@@ -4,9 +4,11 @@ import argparse
 import json
 import sys
 from datetime import date
+from functools import wraps
+from time import time
 
 
-def create_server(read_only=False):
+def create_server(read_only=False, no_cache=False):
     """Create and configure the MCP server."""
     try:
         from fastmcp import FastMCP
@@ -61,9 +63,39 @@ def create_server(read_only=False):
     def _error(msg):
         return json.dumps({"error": str(msg)})
 
+    _cache = {}
+
+    def _make_hashable(obj):
+        if isinstance(obj, list):
+            return tuple(_make_hashable(i) for i in obj)
+        if isinstance(obj, dict):
+            return tuple(sorted((k, _make_hashable(v)) for k, v in obj.items()))
+        return obj
+
+    def _cached(ttl_seconds=300):
+        if no_cache:
+            return lambda func: func
+
+        def decorator(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                key = (func.__name__, args, _make_hashable(kwargs))
+                now = time()
+                if key in _cache and _cache[key][1] > now:
+                    return _cache[key][0]
+                result = func(*args, **kwargs)
+                _cache[key] = (result, now + ttl_seconds)
+                return result
+
+            wrapper.cache = _cache
+            return wrapper
+
+        return decorator
+
     # --- Read tools ---
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=300)
     def get_bug(bug_id: int) -> str:
         """Get full details of a Launchpad bug by ID.
 
@@ -76,6 +108,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=300)
     def get_comments(bug_id: int) -> str:
         """Get all comments on a Launchpad bug.
 
@@ -88,6 +121,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=300)
     def get_attachments(bug_id: int) -> str:
         """Get all attachments on a Launchpad bug.
 
@@ -99,6 +133,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=300)
     def get_subscriptions(bug_id: int) -> str:
         """Get all subscriptions on a Launchpad bug.
 
@@ -111,6 +146,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=300)
     def search_bugs(
         project: str,
         status: list[str] | None = None,
@@ -156,6 +192,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=300)
     def scrub_report(
         project: str,
         days: int = 30,
@@ -179,6 +216,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=3600)
     def cycle_summary(project: str, cycle: str) -> str:
         """Generate a release cycle retrospective for a project.
 
@@ -195,6 +233,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=3600)
     def bugs_reported(project: str, cycle: str) -> str:
         """List bugs reported during a release cycle.
 
@@ -208,6 +247,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=3600)
     def bugs_fixed(project: str, cycle: str) -> str:
         """List bugs fixed during a release cycle.
 
@@ -221,6 +261,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=600)
     def rotten_bugs(project: str, days: int = 180) -> str:
         """Find bugs with no activity for a given number of days.
 
@@ -242,6 +283,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=300)
     def vmt_dashboard(assigned_only: bool = False) -> str:
         """Show open OSSA and OSSN security bugs.
 
@@ -258,6 +300,7 @@ def create_server(read_only=False):
             return _error(e)
 
     @mcp.tool(annotations=READ)
+    @_cached(ttl_seconds=1800)
     def audit_project(project: str) -> str:
         """Audit a Launchpad project's tracker configuration.
 
@@ -513,8 +556,13 @@ def main():
         action="store_true",
         help="Only expose read operations (no bug creation or modification)",
     )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable TTL caching of read-only tool results",
+    )
     args = parser.parse_args()
-    server = create_server(read_only=args.read_only)
+    server = create_server(read_only=args.read_only, no_cache=args.no_cache)
     server.run()
 
 

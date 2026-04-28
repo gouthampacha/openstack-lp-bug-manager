@@ -265,17 +265,42 @@ Read-only mode (disables all write operations):
 lp-bug-mcp --read-only
 ```
 
+Disable caching (every tool call hits the Launchpad API directly):
+
+```
+lp-bug-mcp --no-cache
+```
+
 The server exposes 13 read tools (search, show, scrub, analytics,
 VMT dashboard, audit) and 8 write tools (file, update, subscribe,
-link CVE/Gerrit, add task, intake, retarget). All tools include
-MCP annotations (`readOnlyHint`, `destructiveHint`, `openWorldHint`)
-for client UX.
+link CVE/Gerrit, add task, intake, retarget). Read tools cache
+results with a TTL (5 min for most queries, 1 hour for cycle
+analytics) so repeated calls within a session avoid redundant
+Launchpad API round-trips. Write tools always bypass the cache.
+All tools include MCP annotations (`readOnlyHint`,
+`destructiveHint`, `openWorldHint`) for client UX.
 
 ## Claude Code integration
 
-This repo includes a [Claude Code](https://claude.com/claude-code) slash
-command at `.claude/commands/lp-bug.md`. With Claude Code installed, use
-`/lp-bug` followed by any subcommand:
+This repo includes an [MCP](https://modelcontextprotocol.io/) server
+configuration (`.mcp.json`) and a `/lp-bug` slash command for
+[Claude Code](https://claude.com/claude-code). The slash command
+dispatches to the MCP server's tools instead of shelling out to the CLI.
+
+To use it in any project, add the MCP server to your `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "lp-bug": {
+      "command": "lp-bug-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+Then use `/lp-bug` followed by any subcommand:
 
 ```
 /lp-bug show 2144047 --comments
