@@ -66,16 +66,16 @@ def rotten_bugs(project_name, days=180):
     return results
 
 
-def scrub_report(project_name, days=None, stale_days=30):
+def scrub_report(project_name, days=30, stale_days=30):
     """Generate a bug scrub report with categorized sections.
 
     Args:
-        days: If set, only show bugs with activity in the last N days.
-              Applies to new, incomplete, and unassigned sections.
+        days: Only show bugs created in the last N days (default 30).
+              Use -1 to include all bugs regardless of age.
         stale_days: Threshold for "stale in progress" (default 30).
     """
     created_since = None
-    if days:
+    if days and days > 0:
         created_since = date.today() - timedelta(days=days)
 
     recent_window = date.today() - timedelta(days=7)

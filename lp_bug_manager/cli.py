@@ -525,7 +525,11 @@ def rotten(project, days):
 @click.argument("project", required=False)
 @click.option("--all", "all_projects", is_flag=True, help="Run across all Manila projects")
 @click.option(
-    "--days", "-d", default=None, type=int, help="Only show bugs created in the last N days"
+    "--days",
+    "-d",
+    default=30,
+    type=int,
+    help="Only bugs created in the last N days (default: 30, -1 for all)",
 )
 @click.option(
     "--stale-days", default=30, type=int, help="Threshold for stale In Progress bugs (default: 30)"

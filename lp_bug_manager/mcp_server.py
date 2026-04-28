@@ -158,7 +158,7 @@ def create_server(read_only=False):
     @mcp.tool(annotations=READ)
     def scrub_report(
         project: str,
-        days: int | None = None,
+        days: int = 30,
         stale_days: int = 30,
     ) -> str:
         """Generate a bug scrub agenda for a Launchpad project.
@@ -168,7 +168,8 @@ def create_server(read_only=False):
 
         Args:
             project: Launchpad project name.
-            days: Only include bugs created in the last N days.
+            days: Only include bugs created in the last N days
+                (default 30). Use -1 to include all bugs.
             stale_days: Threshold for flagging in-progress bugs as
                 stale (default 30).
         """
