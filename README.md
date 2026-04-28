@@ -241,6 +241,36 @@ lp-bug audit-trackers --json
 lp-bug audit-trackers --html report.html
 ```
 
+## MCP Server
+
+The package includes a vendor-agnostic
+[MCP](https://modelcontextprotocol.io/) server that exposes the
+Launchpad API to any MCP-compatible client.
+
+Install with MCP support:
+
+```
+pip install openstack-lp-bug-manager[mcp]
+```
+
+Run the server (stdio transport):
+
+```
+lp-bug-mcp
+```
+
+Read-only mode (disables all write operations):
+
+```
+lp-bug-mcp --read-only
+```
+
+The server exposes 13 read tools (search, show, scrub, analytics,
+VMT dashboard, audit) and 8 write tools (file, update, subscribe,
+link CVE/Gerrit, add task, intake, retarget). All tools include
+MCP annotations (`readOnlyHint`, `destructiveHint`, `openWorldHint`)
+for client UX.
+
 ## Claude Code integration
 
 This repo includes a [Claude Code](https://claude.com/claude-code) slash

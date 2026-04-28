@@ -17,12 +17,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = [
-    "pytest",
-]
+mcp = ["fastmcp>=2"]
+test = ["pytest"]
 
 [project.scripts]
 lp-bug = "lp_bug_manager.cli:main"
+lp-bug-mcp = "lp_bug_manager.mcp_server:main"
 
 [tool.setuptools.packages.find]
 include = ["lp_bug_manager*"]
