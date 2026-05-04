@@ -167,6 +167,9 @@ lp-bug file manila "TLS validation bypass" -d "Details..." --information-type "P
 # Update a bug (project is optional when the bug has a single task)
 lp-bug update 2144047 --status Triaged --importance Medium
 
+# Rename a bug
+lp-bug update 2144047 --title "Clearer title for the bug"
+
 # Specify the project when a bug spans multiple projects
 lp-bug update 2144047 manila-ui --status Triaged --importance Medium
 

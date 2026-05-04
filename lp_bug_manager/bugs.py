@@ -148,6 +148,7 @@ def _resolve_task(bug, project_name=None):
 def update_bug(
     bug_id,
     project_name=None,
+    title=None,
     status=None,
     importance=None,
     assignee=None,
@@ -158,7 +159,7 @@ def update_bug(
     remove_tags=None,
     comment=None,
 ):
-    """Update an existing bug's status, importance, assignee, milestone, or tags."""
+    """Update an existing bug's title, status, importance, assignee, milestone, or tags."""
     lp = get_launchpad()
     bug = lp.bugs[bug_id]
     task = _resolve_task(bug, project_name)
@@ -184,22 +185,26 @@ def update_bug(
     if comment:
         bug.newMessage(content=comment)
 
-    tags_changed = False
+    bug_changed = False
+    if title:
+        bug.title = title
+        bug_changed = True
+
     if tags is not None:
         bug.tags = tags
-        tags_changed = True
+        bug_changed = True
     else:
         current = set(bug.tags)
         if add_tags:
             current.update(add_tags)
-            tags_changed = True
+            bug_changed = True
         if remove_tags:
             current -= set(remove_tags)
-            tags_changed = True
-        if tags_changed:
+            bug_changed = True
+        if add_tags or remove_tags:
             bug.tags = sorted(current)
 
-    if tags_changed:
+    if bug_changed:
         bug.lp_save()
 
     return bug

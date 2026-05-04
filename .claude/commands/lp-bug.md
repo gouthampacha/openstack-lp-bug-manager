@@ -18,7 +18,7 @@ Interpret the user's Launchpad bug request and call the appropriate MCP tool fro
 | `vmt-dashboard [--assigned-only]` | `mcp__lp-bug__vmt_dashboard` | `assigned_only` |
 | `audit-trackers <project>` | `mcp__lp-bug__audit_project` | `project` |
 | `file <project> <title> [-d desc] [-i importance] [--status ...] [--information-type ...]` | `mcp__lp-bug__file_bug` | `project`, `title`, `description`, `importance`, `status`, `information_type` |
-| `update <id> [--status ...] [--importance ...] [--assignee ...] [--comment ...]` | `mcp__lp-bug__update_bug` | `bug_id`, `status`, `importance`, `assignee`, `comment`, `add_tags`, `remove_tags`, `milestone` |
+| `update <id> [--title ...] [--status ...] [--importance ...] [--assignee ...] [--comment ...]` | `mcp__lp-bug__update_bug` | `bug_id`, `title`, `status`, `importance`, `assignee`, `comment`, `add_tags`, `remove_tags`, `milestone` |
 | `update <id> --subscribe <name>` | `mcp__lp-bug__subscribe_bug` | `bug_id`, `subscriber` |
 | `update <id> --link-cve <cve>` | `mcp__lp-bug__link_cve` | `bug_id`, `cve_id` |
 | `update <id> --link-gerrit <url>` | `mcp__lp-bug__add_gerrit_link` | `bug_id`, `gerrit_url` |

@@ -244,6 +244,7 @@ def search(project, status, importance, tag, text, since, before, max_results):
 @main.command("update")
 @click.argument("bug_id", type=int)
 @click.argument("project", required=False)
+@click.option("--title", "-T", default=None, help="New title for the bug")
 @click.option("--status", "-s", type=click.Choice(bugs.VALID_STATUSES, case_sensitive=False))
 @click.option(
     "--importance", "-i", type=click.Choice(bugs.VALID_IMPORTANCES, case_sensitive=False)
@@ -272,6 +273,7 @@ def search(project, status, importance, tag, text, since, before, max_results):
 def update(
     bug_id,
     project,
+    title,
     status,
     importance,
     assignee,
@@ -329,6 +331,7 @@ def update(
 
     has_updates = any(
         [
+            title,
             status,
             importance,
             assignee,
@@ -345,6 +348,7 @@ def update(
         bug = bugs.update_bug(
             bug_id,
             project,
+            title=title,
             status=status,
             importance=importance,
             assignee=assignee,

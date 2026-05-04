@@ -231,6 +231,23 @@ class TestWriteTools:
         assert call_kwargs["status"] == "Triaged"
         assert call_kwargs["importance"] == "High"
 
+    @patch("lp_bug_manager.bugs.update_bug")
+    def test_update_bug_title(self, mock_update):
+        bug = MagicMock()
+        bug.id = 100
+        bug.web_link = "https://bugs.launchpad.net/manila/+bug/100"
+        mock_update.return_value = bug
+
+        server = create_server(read_only=False)
+        text = _call(
+            server,
+            "update_bug",
+            {"bug_id": 100, "title": "Renamed bug"},
+        )
+        assert "100" in text
+        mock_update.assert_called_once()
+        assert mock_update.call_args[1]["title"] == "Renamed bug"
+
     @patch("lp_bug_manager.bugs.subscribe_bug")
     def test_subscribe_bug(self, mock_sub):
         bug = MagicMock()

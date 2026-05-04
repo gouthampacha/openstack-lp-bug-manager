@@ -366,6 +366,7 @@ def create_server(read_only=False, no_cache=False):
         def update_bug(
             bug_id: int,
             project: str | None = None,
+            title: str | None = None,
             status: str | None = None,
             importance: str | None = None,
             assignee: str | None = None,
@@ -382,6 +383,7 @@ def create_server(read_only=False, no_cache=False):
                 bug_id: Launchpad bug ID.
                 project: Project name (required when the bug has
                     tasks on multiple projects).
+                title: New title for the bug.
                 status: New status.
                 importance: New importance.
                 assignee: Launchpad username to assign.
@@ -400,6 +402,7 @@ def create_server(read_only=False, no_cache=False):
                 bug = bugs.update_bug(
                     bug_id,
                     project,
+                    title=title,
                     status=status,
                     importance=importance,
                     assignee=assignee,

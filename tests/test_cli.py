@@ -214,6 +214,18 @@ class TestUpdate:
         assert "deactivated again" in result.output
         mock_update.assert_called_once()
 
+    @patch("lp_bug_manager.cli.bugs.update_bug")
+    def test_title_option(self, mock_update, runner):
+        mock_bug = MagicMock()
+        mock_bug.id = 100
+        mock_bug.web_link = "https://bugs.launchpad.net/manila/+bug/100"
+        mock_update.return_value = mock_bug
+
+        result = runner.invoke(main, ["update", "100", "--title", "New bug title"])
+        assert result.exit_code == 0
+        mock_update.assert_called_once()
+        assert mock_update.call_args[1]["title"] == "New bug title"
+
     @patch("lp_bug_manager.cli.bugs.subscribe_bug")
     def test_subscribe_option(self, mock_subscribe, runner):
         result = runner.invoke(main, ["update", "2150316", "--subscribe", "oslo-coresec"])
